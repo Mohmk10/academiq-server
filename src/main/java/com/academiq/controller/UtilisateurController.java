@@ -119,6 +119,24 @@ public class UtilisateurController {
         return ResponseEntity.ok(ApiResponse.success("Rôle modifié avec succès"));
     }
 
+    @GetMapping("/recherche")
+    @IsAdminOrResponsable
+    public ResponseEntity<ApiResponse<PageResponse<UtilisateurSummaryResponse>>> rechercherUtilisateurs(
+            @RequestParam String keyword,
+            @RequestParam(defaultValue = PaginationConstants.DEFAULT_PAGE) int page,
+            @RequestParam(defaultValue = PaginationConstants.DEFAULT_SIZE) int size,
+            @RequestParam(defaultValue = PaginationConstants.DEFAULT_SORT_FIELD) String sortBy,
+            @RequestParam(defaultValue = PaginationConstants.DEFAULT_SORT_DIRECTION) String direction) {
+
+        Sort sort = direction.equalsIgnoreCase("asc") ? Sort.by(sortBy).ascending() : Sort.by(sortBy).descending();
+        Page<Utilisateur> utilisateurs = utilisateurService.rechercher(keyword, PageRequest.of(page, size, sort));
+        PageResponse<UtilisateurSummaryResponse> response = PageResponse.of(
+                utilisateurs,
+                utilisateurProfilMapper.toSummaryList(utilisateurs.getContent())
+        );
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
     @GetMapping("/stats")
     @IsAdminOrResponsable
     public ResponseEntity<ApiResponse<Map<String, Object>>> getStatistiques() {

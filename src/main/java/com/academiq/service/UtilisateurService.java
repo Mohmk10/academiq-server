@@ -168,6 +168,10 @@ public class UtilisateurService {
         return utilisateurRepository.countByActifTrue();
     }
 
+    public Page<Utilisateur> rechercher(String keyword, Pageable pageable) {
+        return utilisateurRepository.rechercher(keyword, pageable);
+    }
+
     private void createEtudiantProfil(Utilisateur utilisateur, UtilisateurCreateRequest request) {
         String matricule = request.getMatriculeEtudiant();
         if (matricule == null || matricule.isBlank()) {
