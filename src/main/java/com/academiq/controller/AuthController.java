@@ -2,6 +2,7 @@ package com.academiq.controller;
 
 import com.academiq.dto.ApiResponse;
 import com.academiq.dto.auth.AuthResponse;
+import com.academiq.dto.auth.ChangePasswordRequest;
 import com.academiq.dto.auth.LoginRequest;
 import com.academiq.dto.auth.RefreshTokenRequest;
 import com.academiq.dto.auth.RegisterRequest;
@@ -20,6 +21,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -61,5 +63,14 @@ public class AuthController {
     public ResponseEntity<ApiResponse<UtilisateurResponse>> me(@AuthenticationPrincipal Utilisateur utilisateur) {
         UtilisateurResponse response = utilisateurMapper.toResponse(utilisateur);
         return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @PutMapping("/change-password")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<Void>> changePassword(
+            @AuthenticationPrincipal Utilisateur utilisateur,
+            @Valid @RequestBody ChangePasswordRequest request) {
+        authService.changePassword(utilisateur, request);
+        return ResponseEntity.ok(ApiResponse.success("Mot de passe modifié avec succès"));
     }
 }

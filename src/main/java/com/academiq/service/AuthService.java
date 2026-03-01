@@ -1,9 +1,11 @@
 package com.academiq.service;
 
 import com.academiq.dto.auth.AuthResponse;
+import com.academiq.dto.auth.ChangePasswordRequest;
 import com.academiq.dto.auth.LoginRequest;
 import com.academiq.dto.auth.RefreshTokenRequest;
 import com.academiq.dto.auth.RegisterRequest;
+import com.academiq.exception.BadRequestException;
 import com.academiq.entity.Role;
 import com.academiq.entity.Utilisateur;
 import com.academiq.exception.DuplicateResourceException;
@@ -92,6 +94,20 @@ public class AuthService {
                 .email(utilisateur.getEmail())
                 .role(utilisateur.getRole().name())
                 .build();
+    }
+
+    @Transactional
+    public void changePassword(Utilisateur utilisateur, ChangePasswordRequest request) {
+        if (!request.getNouveauMotDePasse().equals(request.getConfirmationMotDePasse())) {
+            throw new BadRequestException("Les mots de passe ne correspondent pas");
+        }
+
+        if (!passwordEncoder.matches(request.getAncienMotDePasse(), utilisateur.getMotDePasse())) {
+            throw new BadRequestException("Ancien mot de passe incorrect");
+        }
+
+        utilisateur.setMotDePasse(passwordEncoder.encode(request.getNouveauMotDePasse()));
+        utilisateurRepository.save(utilisateur);
     }
 
     private AuthResponse buildAuthResponse(Utilisateur utilisateur) {
