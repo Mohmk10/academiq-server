@@ -1,0 +1,19 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://ep-old-river-ai5mohqq-pooler.c-4.us-east-1.aws.neon.tech/academiqdb?sslmode=require
+    username: academiq_owner
+    password: El_Mohmk@10
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      minimum-idle: 2
+      maximum-pool-size: 5
+      connection-timeout: 30000
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.PostgreSQLDialect
