@@ -2,6 +2,7 @@ package com.academiq.controller;
 
 import com.academiq.dto.ApiResponse;
 import com.academiq.dto.PageResponse;
+import com.academiq.dto.utilisateur.ImportResult;
 import com.academiq.dto.utilisateur.UtilisateurCreateRequest;
 import com.academiq.dto.utilisateur.UtilisateurDetailResponse;
 import com.academiq.dto.utilisateur.UtilisateurSummaryResponse;
@@ -11,6 +12,7 @@ import com.academiq.entity.Utilisateur;
 import com.academiq.mapper.UtilisateurProfilMapper;
 import com.academiq.security.IsAdmin;
 import com.academiq.security.IsAdminOrResponsable;
+import com.academiq.service.ImportService;
 import com.academiq.service.UtilisateurService;
 import com.academiq.util.PaginationConstants;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -33,6 +35,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -47,6 +50,7 @@ public class UtilisateurController {
 
     private final UtilisateurService utilisateurService;
     private final UtilisateurProfilMapper utilisateurProfilMapper;
+    private final ImportService importService;
 
     @GetMapping
     @IsAdminOrResponsable
@@ -151,5 +155,15 @@ public class UtilisateurController {
         stats.put("responsablesPedagogiques", utilisateurService.countByRole(Role.RESPONSABLE_PEDAGOGIQUE));
         stats.put("actifs", utilisateurService.countActifs());
         return ResponseEntity.ok(ApiResponse.success(stats));
+    }
+
+    @PostMapping("/import-etudiants")
+    @IsAdmin
+    public ResponseEntity<ApiResponse<ImportResult>> importerEtudiants(
+            @RequestParam("fichier") MultipartFile fichier) {
+        log.info("Import CSV d'étudiants : {}", fichier.getOriginalFilename());
+        ImportResult result = importService.importerEtudiantsCSV(fichier);
+        String message = String.format("Import terminé : %d importés, %d échecs", result.getImportes(), result.getEchecs());
+        return ResponseEntity.ok(ApiResponse.success(message, result));
     }
 }
