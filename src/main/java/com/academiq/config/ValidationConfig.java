@@ -11,7 +11,7 @@ import org.springframework.validation.beanvalidation.MethodValidationPostProcess
 public class ValidationConfig {
 
     @Bean
-    public MessageSource messageSource() {
+    public static MessageSource messageSource() {
         ReloadableResourceBundleMessageSource messageSource = new ReloadableResourceBundleMessageSource();
         messageSource.setBasename("classpath:messages");
         messageSource.setDefaultEncoding("UTF-8");
@@ -19,14 +19,14 @@ public class ValidationConfig {
     }
 
     @Bean
-    public LocalValidatorFactoryBean validator(MessageSource messageSource) {
+    public static LocalValidatorFactoryBean validator(MessageSource messageSource) {
         LocalValidatorFactoryBean validator = new LocalValidatorFactoryBean();
         validator.setValidationMessageSource(messageSource);
         return validator;
     }
 
     @Bean
-    public MethodValidationPostProcessor methodValidationPostProcessor(LocalValidatorFactoryBean validator) {
+    public static MethodValidationPostProcessor methodValidationPostProcessor(LocalValidatorFactoryBean validator) {
         MethodValidationPostProcessor processor = new MethodValidationPostProcessor();
         processor.setValidator(validator);
         return processor;

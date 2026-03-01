@@ -3,3 +3,13 @@ spring:
     name: AcademiQ
   profiles:
     active: dev
+
+server:
+  servlet:
+    context-path: /api
+
+logging:
+  level:
+    root: INFO
+    com.academiq: DEBUG
+    org.hibernate.SQL: DEBUG
