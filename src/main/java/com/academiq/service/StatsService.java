@@ -2,9 +2,18 @@ package com.academiq.service;
 
 import com.academiq.dto.calcul.BulletinEtudiantDTO;
 import com.academiq.dto.stats.DistributionNotesDTO;
+import com.academiq.dto.stats.EvolutionModuleDTO;
+import com.academiq.dto.stats.EvolutionPerformanceDTO;
+import com.academiq.dto.stats.PeriodeModuleDTO;
+import com.academiq.dto.stats.PeriodePerformanceDTO;
 import com.academiq.dto.stats.TauxReussiteDTO;
 import com.academiq.dto.stats.TrancheDTO;
+import com.academiq.entity.Etudiant;
+import com.academiq.entity.Evaluation;
+import com.academiq.entity.ModuleFormation;
 import com.academiq.entity.Note;
+import com.academiq.entity.Promotion;
+import com.academiq.exception.ResourceNotFoundException;
 import com.academiq.entity.DecisionJury;
 import com.academiq.entity.Inscription;
 import com.academiq.entity.StatutInscription;
@@ -28,7 +37,10 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -178,6 +190,96 @@ public class StatsService {
         }
 
         return construireDistribution("Évaluation", valeurs);
+    }
+
+    public EvolutionPerformanceDTO calculerEvolutionEtudiant(Long etudiantId) {
+        Etudiant etudiant = etudiantRepository.findById(etudiantId)
+                .orElseThrow(() -> new ResourceNotFoundException("Étudiant", "id", etudiantId));
+
+        List<Inscription> inscriptions = inscriptionRepository.findByEtudiantId(etudiantId);
+        inscriptions.sort(Comparator.comparing(Inscription::getDateInscription));
+
+        List<PeriodePerformanceDTO> periodes = new ArrayList<>();
+
+        for (Inscription inscription : inscriptions) {
+            try {
+                BulletinEtudiantDTO bulletin = bulletinService.genererBulletin(
+                        etudiantId, inscription.getPromotion().getId());
+
+                periodes.add(PeriodePerformanceDTO.builder()
+                        .promotionNom(bulletin.getPromotionNom())
+                        .anneeUniversitaire(bulletin.getAnneeUniversitaire())
+                        .niveauNom(bulletin.getNiveauNom())
+                        .moyenneAnnuelle(bulletin.getMoyenneAnnuelle())
+                        .creditsValides(bulletin.getCreditsValides())
+                        .creditsTotaux(bulletin.getCreditsTotaux())
+                        .decision(bulletin.getDecision())
+                        .build());
+            } catch (Exception e) {
+                log.warn("Erreur évolution étudiant {} promotion {}",
+                        etudiantId, inscription.getPromotion().getId(), e);
+            }
+        }
+
+        var utilisateur = etudiant.getUtilisateur();
+        return EvolutionPerformanceDTO.builder()
+                .etudiantNom(utilisateur.getPrenom() + " " + utilisateur.getNom())
+                .etudiantMatricule(etudiant.getMatricule())
+                .periodes(periodes)
+                .build();
+    }
+
+    public EvolutionModuleDTO calculerEvolutionModule(Long moduleId) {
+        ModuleFormation module = moduleFormationRepository.findById(moduleId)
+                .orElseThrow(() -> new ResourceNotFoundException("Module", "id", moduleId));
+
+        List<Evaluation> evaluations = evaluationRepository.findByModuleFormationId(moduleId);
+        Set<Long> promotionIds = new LinkedHashSet<>();
+        for (Evaluation eval : evaluations) {
+            promotionIds.add(eval.getPromotion().getId());
+        }
+
+        List<PeriodeModuleDTO> periodes = new ArrayList<>();
+
+        for (Long promotionId : promotionIds) {
+            Promotion promotion = promotionRepository.findById(promotionId).orElse(null);
+            if (promotion == null) continue;
+
+            List<Inscription> inscriptions = inscriptionRepository
+                    .findByPromotionIdAndStatut(promotionId, StatutInscription.ACTIVE);
+
+            List<Double> moyennes = new ArrayList<>();
+            int reussis = 0;
+
+            for (Inscription inscription : inscriptions) {
+                Double moyenne = calculService.calculerMoyenneModule(
+                        inscription.getEtudiant().getId(), moduleId, promotionId);
+                if (moyenne != null) {
+                    moyennes.add(moyenne);
+                    if (moyenne >= 10) reussis++;
+                }
+            }
+
+            Double moyenneClasse = calculerMoyenneListe(moyennes);
+            int total = inscriptions.size();
+            double taux = total > 0 ? arrondir(reussis * 100.0 / total) : 0;
+
+            periodes.add(PeriodeModuleDTO.builder()
+                    .anneeUniversitaire(promotion.getAnneeUniversitaire())
+                    .promotionNom(promotion.getNom())
+                    .moyenneClasse(moyenneClasse)
+                    .tauxReussite(taux)
+                    .nombreInscrits(total)
+                    .build());
+        }
+
+        periodes.sort(Comparator.comparing(PeriodeModuleDTO::getAnneeUniversitaire));
+
+        return EvolutionModuleDTO.builder()
+                .moduleNom(module.getNom())
+                .moduleCode(module.getCode())
+                .periodes(periodes)
+                .build();
     }
 
     private DistributionNotesDTO construireDistribution(String contexte, List<Double> valeurs) {
