@@ -1,7 +1,10 @@
 package com.academiq.service;
 
 import com.academiq.dto.calcul.BulletinEtudiantDTO;
+import com.academiq.dto.stats.DistributionNotesDTO;
 import com.academiq.dto.stats.TauxReussiteDTO;
+import com.academiq.dto.stats.TrancheDTO;
+import com.academiq.entity.Note;
 import com.academiq.entity.DecisionJury;
 import com.academiq.entity.Inscription;
 import com.academiq.entity.StatutInscription;
@@ -24,6 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 @Service
@@ -144,6 +148,100 @@ public class StatsService {
                 .totalEchecs(total - totalReussis)
                 .tauxReussite(taux)
                 .moyenneGenerale(moyenneGenerale)
+                .build();
+    }
+
+    public DistributionNotesDTO calculerDistributionModule(Long moduleId, Long promotionId) {
+        List<Inscription> inscriptions = inscriptionRepository
+                .findByPromotionIdAndStatut(promotionId, StatutInscription.ACTIVE);
+
+        List<Double> valeurs = new ArrayList<>();
+        for (Inscription inscription : inscriptions) {
+            Double moyenne = calculService.calculerMoyenneModule(
+                    inscription.getEtudiant().getId(), moduleId, promotionId);
+            if (moyenne != null) {
+                valeurs.add(moyenne);
+            }
+        }
+
+        return construireDistribution("Module", valeurs);
+    }
+
+    public DistributionNotesDTO calculerDistributionEvaluation(Long evaluationId) {
+        List<Note> notes = noteRepository.findByEvaluationId(evaluationId);
+
+        List<Double> valeurs = new ArrayList<>();
+        for (Note note : notes) {
+            if (!note.isAbsent() && note.getValeur() != null) {
+                valeurs.add(note.getValeur());
+            }
+        }
+
+        return construireDistribution("Évaluation", valeurs);
+    }
+
+    private DistributionNotesDTO construireDistribution(String contexte, List<Double> valeurs) {
+        if (valeurs.isEmpty()) {
+            return DistributionNotesDTO.builder()
+                    .contexte(contexte)
+                    .tranches(List.of())
+                    .totalNotes(0)
+                    .build();
+        }
+
+        Collections.sort(valeurs);
+        int total = valeurs.size();
+
+        double[][] bornes = {
+                {0, 4}, {4, 8}, {8, 10}, {10, 12}, {12, 14}, {14, 16}, {16, 20}
+        };
+        String[] labels = {"0-4", "4-8", "8-10", "10-12", "12-14", "14-16", "16-20"};
+
+        List<TrancheDTO> tranches = new ArrayList<>();
+        for (int i = 0; i < bornes.length; i++) {
+            double inf = bornes[i][0];
+            double sup = bornes[i][1];
+            int count = 0;
+            for (double v : valeurs) {
+                if (i == bornes.length - 1) {
+                    if (v >= inf && v <= sup) count++;
+                } else {
+                    if (v >= inf && v < sup) count++;
+                }
+            }
+            tranches.add(TrancheDTO.builder()
+                    .label(labels[i])
+                    .borneInf(inf)
+                    .borneSup(sup)
+                    .nombre(count)
+                    .pourcentage(arrondir(count * 100.0 / total))
+                    .build());
+        }
+
+        double somme = valeurs.stream().mapToDouble(Double::doubleValue).sum();
+        double moyenne = somme / total;
+
+        double mediane;
+        if (total % 2 == 0) {
+            mediane = (valeurs.get(total / 2 - 1) + valeurs.get(total / 2)) / 2.0;
+        } else {
+            mediane = valeurs.get(total / 2);
+        }
+
+        double varianceSum = valeurs.stream()
+                .mapToDouble(v -> Math.pow(v - moyenne, 2))
+                .sum();
+        double ecartType = Math.sqrt(varianceSum / total);
+
+        return DistributionNotesDTO.builder()
+                .contexte(contexte)
+                .tranches(tranches)
+                .moyenne(arrondir(moyenne))
+                .mediane(arrondir(mediane))
+                .ecartType(arrondir(ecartType))
+                .noteMin(valeurs.getFirst())
+                .noteMax(valeurs.getLast())
+                .totalNotes(total)
                 .build();
     }
 
