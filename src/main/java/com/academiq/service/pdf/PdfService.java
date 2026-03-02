@@ -6,7 +6,10 @@ import com.academiq.dto.calcul.BulletinSemestreDTO;
 import com.academiq.dto.calcul.BulletinUeDTO;
 import com.academiq.entity.DecisionJury;
 import com.academiq.entity.Etudiant;
+import com.academiq.entity.Inscription;
+import com.academiq.entity.Niveau;
 import com.academiq.entity.Promotion;
+import com.academiq.entity.StatutInscription;
 import com.academiq.entity.Utilisateur;
 import com.academiq.exception.BadRequestException;
 import com.academiq.exception.ResourceNotFoundException;
@@ -40,6 +43,9 @@ import java.awt.Color;
 import java.io.ByteArrayOutputStream;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
 import java.util.Locale;
 
 @Service
@@ -231,6 +237,204 @@ public class PdfService {
             log.error("Erreur lors de la génération de l'attestation", e);
             throw new RuntimeException("Erreur lors de la génération du PDF", e);
         }
+    }
+
+    public byte[] genererPVDeliberation(Long promotionId) {
+        Promotion promotion = promotionRepository.findById(promotionId)
+                .orElseThrow(() -> new ResourceNotFoundException("Promotion", "id", promotionId));
+        Niveau niveau = promotion.getNiveau();
+
+        List<Inscription> inscriptions = inscriptionRepository
+                .findByPromotionIdAndStatut(promotionId, StatutInscription.ACTIVE);
+
+        List<BulletinEtudiantDTO> bulletins = new ArrayList<>();
+        for (Inscription inscription : inscriptions) {
+            try {
+                BulletinEtudiantDTO bulletin = bulletinService.genererBulletin(
+                        inscription.getEtudiant().getId(), promotionId);
+                bulletins.add(bulletin);
+            } catch (Exception e) {
+                log.warn("Impossible de générer le bulletin pour l'étudiant {}",
+                        inscription.getEtudiant().getId(), e);
+            }
+        }
+
+        bulletins.sort(Comparator.comparing(
+                BulletinEtudiantDTO::getMoyenneAnnuelle,
+                Comparator.nullsLast(Comparator.reverseOrder())));
+
+        try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
+            Document document = new Document(PageSize.A4.rotate(), 30, 30, 40, 50);
+            PdfWriter writer = PdfWriter.getInstance(document, baos);
+            ajouterPiedDePage(writer);
+            document.open();
+
+            ajouterEnTete(document, "PROCÈS-VERBAL DE DÉLIBÉRATION");
+
+            PdfPTable infos = new PdfPTable(2);
+            infos.setWidthPercentage(100);
+            infos.setWidths(new float[]{1, 1});
+            ajouterInfoLigne(infos, "Filière", niveau.getFiliere().getNom());
+            ajouterInfoLigne(infos, "Niveau", niveau.getNiveau().name());
+            ajouterInfoLigne(infos, "Promotion", promotion.getNom());
+            ajouterInfoLigne(infos, "Année universitaire", promotion.getAnneeUniversitaire());
+            ajouterInfoLigne(infos, "Date de délibération", LocalDate.now().format(DATE_FORMATTER));
+            document.add(infos);
+
+            PdfStyleHelper.addEmptyLine(document, 1);
+
+            PdfPTable table = PdfStyleHelper.createStyledTable(9,
+                    new float[]{0.6f, 1.5f, 3f, 1.2f, 1.2f, 1.2f, 1f, 1.5f, 1.5f});
+            table.addCell(PdfStyleHelper.createHeaderCell("N°"));
+            table.addCell(PdfStyleHelper.createHeaderCell("Matricule"));
+            table.addCell(PdfStyleHelper.createHeaderCell("Nom & Prénom"));
+            table.addCell(PdfStyleHelper.createHeaderCell("Moy. S1"));
+            table.addCell(PdfStyleHelper.createHeaderCell("Moy. S2"));
+            table.addCell(PdfStyleHelper.createHeaderCell("Moy. An."));
+            table.addCell(PdfStyleHelper.createHeaderCell("Crédits"));
+            table.addCell(PdfStyleHelper.createHeaderCell("Décision"));
+            table.addCell(PdfStyleHelper.createHeaderCell("Mention"));
+
+            int numero = 1;
+            int nbAdmis = 0;
+            int nbAjournes = 0;
+            int nbRattrapage = 0;
+            double sommeMoyennes = 0;
+            int nbMoyennes = 0;
+            Color rouge = new Color(200, 0, 0);
+
+            for (BulletinEtudiantDTO b : bulletins) {
+                Color bgColor = (numero % 2 == 0) ? PdfStyleHelper.getCouleurSecondaire() : Color.WHITE;
+
+                table.addCell(createColoredCell(String.valueOf(numero), bgColor, true));
+                table.addCell(createColoredCell(b.getEtudiantMatricule(), bgColor, false));
+                table.addCell(createColoredCell(b.getEtudiantPrenom() + " " + b.getEtudiantNom(), bgColor, false));
+
+                Double moyS1 = (b.getSemestres() != null && !b.getSemestres().isEmpty())
+                        ? b.getSemestres().get(0).getMoyenneSemestre() : null;
+                Double moyS2 = (b.getSemestres() != null && b.getSemestres().size() > 1)
+                        ? b.getSemestres().get(1).getMoyenneSemestre() : null;
+
+                table.addCell(createNoteCell(moyS1, bgColor, rouge));
+                table.addCell(createNoteCell(moyS2, bgColor, rouge));
+                table.addCell(createNoteCell(b.getMoyenneAnnuelle(), bgColor, rouge));
+
+                table.addCell(createColoredCell(
+                        b.getCreditsValides() + "/" + b.getCreditsTotaux(), bgColor, true));
+                table.addCell(createColoredCell(
+                        b.getDecision() != null ? b.getDecision() : "—", bgColor, true));
+                table.addCell(createColoredCell(
+                        b.getMention() != null ? b.getMention() : "—", bgColor, true));
+
+                if (DecisionJury.ADMIS.name().equals(b.getDecision())
+                        || DecisionJury.ADMIS_COMPENSATION.name().equals(b.getDecision())) {
+                    nbAdmis++;
+                } else if (DecisionJury.AJOURNE.name().equals(b.getDecision())) {
+                    nbAjournes++;
+                } else if (DecisionJury.RATTRAPAGE.name().equals(b.getDecision())) {
+                    nbRattrapage++;
+                }
+
+                if (b.getMoyenneAnnuelle() != null) {
+                    sommeMoyennes += b.getMoyenneAnnuelle();
+                    nbMoyennes++;
+                }
+                numero++;
+            }
+
+            document.add(table);
+            PdfStyleHelper.addEmptyLine(document, 1);
+
+            int totalInscrits = bulletins.size();
+            double tauxReussite = totalInscrits > 0 ? (nbAdmis * 100.0 / totalInscrits) : 0;
+            double moyennePromo = nbMoyennes > 0 ? sommeMoyennes / nbMoyennes : 0;
+
+            Paragraph titreStats = new Paragraph("Statistiques", PdfStyleHelper.getSubtitleFont());
+            titreStats.setSpacingAfter(5);
+            document.add(titreStats);
+
+            PdfPTable statsTable = new PdfPTable(2);
+            statsTable.setWidthPercentage(60);
+            statsTable.setHorizontalAlignment(Element.ALIGN_LEFT);
+            statsTable.setWidths(new float[]{2, 1});
+
+            ajouterLigneStats(statsTable, "Nombre d'inscrits", String.valueOf(totalInscrits));
+            ajouterLigneStats(statsTable, "Nombre d'admis", String.valueOf(nbAdmis));
+            ajouterLigneStats(statsTable, "Nombre d'ajournés", String.valueOf(nbAjournes));
+            ajouterLigneStats(statsTable, "Nombre en rattrapage", String.valueOf(nbRattrapage));
+            ajouterLigneStats(statsTable, "Taux de réussite",
+                    String.format("%d/%d = %.1f%%", nbAdmis, totalInscrits, tauxReussite));
+            ajouterLigneStats(statsTable, "Moyenne de la promotion",
+                    String.format("%.2f / 20", moyennePromo));
+
+            document.add(statsTable);
+            PdfStyleHelper.addEmptyLine(document, 2);
+
+            PdfPTable signatures = new PdfPTable(2);
+            signatures.setWidthPercentage(100);
+            signatures.setWidths(new float[]{1, 1});
+
+            PdfPCell cellPresJury = new PdfPCell();
+            cellPresJury.setBorder(0);
+            cellPresJury.setHorizontalAlignment(Element.ALIGN_CENTER);
+            cellPresJury.addElement(centrerParagraphe("Le Président du Jury"));
+            cellPresJury.addElement(centrerParagraphe(" "));
+            cellPresJury.addElement(centrerParagraphe(" "));
+            cellPresJury.addElement(centrerParagraphe(" "));
+            cellPresJury.addElement(centrerParagraphe("_________________________"));
+            signatures.addCell(cellPresJury);
+
+            PdfPCell cellDirecteur = new PdfPCell();
+            cellDirecteur.setBorder(0);
+            cellDirecteur.setHorizontalAlignment(Element.ALIGN_CENTER);
+            cellDirecteur.addElement(centrerParagraphe("Le Directeur des Études"));
+            cellDirecteur.addElement(centrerParagraphe(" "));
+            cellDirecteur.addElement(centrerParagraphe(" "));
+            cellDirecteur.addElement(centrerParagraphe(" "));
+            cellDirecteur.addElement(centrerParagraphe("_________________________"));
+            signatures.addCell(cellDirecteur);
+
+            document.add(signatures);
+
+            document.close();
+            log.info("PV de délibération généré pour la promotion {}", promotionId);
+            return baos.toByteArray();
+        } catch (Exception e) {
+            log.error("Erreur lors de la génération du PV de délibération", e);
+            throw new RuntimeException("Erreur lors de la génération du PDF", e);
+        }
+    }
+
+    private PdfPCell createNoteCell(Double note, Color bgColor, Color couleurRouge) {
+        String text = formatNote(note);
+        Font font = PdfStyleHelper.getNormalFont();
+        if (note != null && note < 10) {
+            font = FontFactory.getFont(FontFactory.HELVETICA, 10, Font.NORMAL, couleurRouge);
+        }
+        PdfPCell cell = new PdfPCell(new Phrase(text, font));
+        cell.setPadding(5);
+        cell.setBackgroundColor(bgColor);
+        cell.setHorizontalAlignment(Element.ALIGN_CENTER);
+        cell.setVerticalAlignment(Element.ALIGN_MIDDLE);
+        return cell;
+    }
+
+    private void ajouterLigneStats(PdfPTable table, String label, String valeur) {
+        PdfPCell cellLabel = new PdfPCell(new Phrase(label, PdfStyleHelper.getNormalFont()));
+        cellLabel.setPadding(4);
+        cellLabel.setBackgroundColor(PdfStyleHelper.getCouleurSecondaire());
+        table.addCell(cellLabel);
+
+        PdfPCell cellValeur = new PdfPCell(new Phrase(valeur, PdfStyleHelper.getBoldFont()));
+        cellValeur.setPadding(4);
+        cellValeur.setHorizontalAlignment(Element.ALIGN_CENTER);
+        table.addCell(cellValeur);
+    }
+
+    private Paragraph centrerParagraphe(String text) {
+        Paragraph p = new Paragraph(text, PdfStyleHelper.getBoldFont());
+        p.setAlignment(Element.ALIGN_CENTER);
+        return p;
     }
 
     private void ajouterBlocInfosEtudiant(Document document, BulletinEtudiantDTO bulletin)
