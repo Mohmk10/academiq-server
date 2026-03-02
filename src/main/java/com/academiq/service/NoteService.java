@@ -5,7 +5,6 @@ import com.academiq.entity.Evaluation;
 import com.academiq.entity.Etudiant;
 import com.academiq.entity.Note;
 import com.academiq.entity.StatutEvaluation;
-import com.academiq.entity.StatutInscription;
 import com.academiq.entity.Utilisateur;
 import com.academiq.exception.BadRequestException;
 import com.academiq.exception.DuplicateResourceException;
@@ -41,6 +40,7 @@ public class NoteService {
     private final UtilisateurRepository utilisateurRepository;
     private final ModuleFormationRepository moduleFormationRepository;
     private final PromotionRepository promotionRepository;
+    private final NoteValidationService noteValidationService;
 
     // ======================== Évaluations ========================
 
@@ -78,9 +78,7 @@ public class NoteService {
     @Transactional
     public Evaluation updateEvaluation(Long id, Evaluation data) {
         Evaluation evaluation = getEvaluationById(id);
-        if (evaluation.getStatut() == StatutEvaluation.VERROUILLEE) {
-            throw new BadRequestException("Cette évaluation est verrouillée, aucune modification possible");
-        }
+        noteValidationService.validerEvaluationModifiable(evaluation);
 
         if (data.getNom() != null) {
             evaluation.setNom(data.getNom());
@@ -120,32 +118,16 @@ public class NoteService {
     public Note saisirNote(Long evaluationId, Long etudiantId, Double valeur, boolean absent,
                            String commentaire, Long saisiParId) {
         Evaluation evaluation = getEvaluationById(evaluationId);
-        if (evaluation.getStatut() == StatutEvaluation.VERROUILLEE) {
-            throw new BadRequestException("Cette évaluation est verrouillée, aucune modification possible");
-        }
+        noteValidationService.validerEvaluationModifiable(evaluation);
 
         Etudiant etudiant = etudiantRepository.findById(etudiantId)
                 .orElseThrow(() -> new ResourceNotFoundException("Étudiant", "id", etudiantId));
 
-        boolean inscrit = inscriptionRepository.findByEtudiantIdAndPromotionId(etudiantId, evaluation.getPromotion().getId())
-                .filter(i -> i.getStatut() == StatutInscription.ACTIVE)
-                .isPresent();
-        if (!inscrit) {
-            throw new BadRequestException("L'étudiant n'est pas inscrit à cette promotion");
-        }
+        noteValidationService.validerEtudiantInscrit(etudiantId, evaluation.getPromotion().getId(), inscriptionRepository);
+        noteValidationService.validerNote(valeur, evaluation.getNoteMaximale(), absent);
 
         if (absent) {
             valeur = null;
-        } else {
-            if (valeur == null) {
-                throw new BadRequestException("La note est obligatoire pour un étudiant présent");
-            }
-            if (valeur < 0) {
-                throw new BadRequestException("La note ne peut pas être négative");
-            }
-            if (valeur > evaluation.getNoteMaximale()) {
-                throw new BadRequestException("La note ne peut pas dépasser " + evaluation.getNoteMaximale());
-            }
         }
 
         Utilisateur saisiPar = null;
