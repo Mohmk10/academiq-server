@@ -4,6 +4,7 @@ import com.academiq.entity.Evaluation;
 import com.academiq.entity.ModuleFormation;
 import com.academiq.entity.Note;
 import com.academiq.entity.TypeEvaluation;
+import com.academiq.entity.Niveau;
 import com.academiq.entity.Semestre;
 import com.academiq.entity.UniteEnseignement;
 import com.academiq.exception.ResourceNotFoundException;
@@ -11,6 +12,7 @@ import com.academiq.repository.EvaluationRepository;
 import com.academiq.repository.InscriptionRepository;
 import com.academiq.repository.ModuleFormationRepository;
 import com.academiq.repository.NoteRepository;
+import com.academiq.repository.NiveauRepository;
 import com.academiq.repository.SemestreRepository;
 import com.academiq.repository.UniteEnseignementRepository;
 import lombok.RequiredArgsConstructor;
@@ -41,6 +43,7 @@ public class CalculService {
     private final ModuleFormationRepository moduleFormationRepository;
     private final UniteEnseignementRepository uniteEnseignementRepository;
     private final SemestreRepository semestreRepository;
+    private final NiveauRepository niveauRepository;
     private final InscriptionRepository inscriptionRepository;
 
     private static final Set<TypeEvaluation> TYPES_CC = EnumSet.of(
@@ -209,5 +212,44 @@ public class CalculService {
         }
 
         return arrondir(sommeValeurCoeff / sommeCoeff, 2);
+    }
+
+    /**
+     * Calcule la moyenne annuelle d'un étudiant pour un niveau donné.
+     * Pondère les semestres par le total des crédits de leurs UEs.
+     *
+     * @return la moyenne arrondie à 2 décimales, ou null si aucun semestre n'a de note
+     */
+    public Double calculerMoyenneAnnuelle(Long etudiantId, Long niveauId, Long promotionId) {
+        Niveau niveau = niveauRepository.findById(niveauId)
+                .orElseThrow(() -> new ResourceNotFoundException("Niveau", "id", niveauId));
+
+        List<Semestre> semestres = semestreRepository.findByNiveauId(niveauId);
+
+        double sommeCredits = 0;
+        double sommeValeurCredits = 0;
+
+        for (Semestre semestre : semestres) {
+            Double moyenneSemestre = calculerMoyenneSemestre(etudiantId, semestre.getId(), promotionId);
+            if (moyenneSemestre != null) {
+                int creditsSemestre = calculerCreditsTotauxSemestre(semestre.getId());
+                sommeValeurCredits += moyenneSemestre * creditsSemestre;
+                sommeCredits += creditsSemestre;
+            }
+        }
+
+        if (sommeCredits == 0) {
+            return null;
+        }
+
+        return arrondir(sommeValeurCredits / sommeCredits, 2);
+    }
+
+    /**
+     * Calcule le total des crédits des UEs d'un semestre.
+     */
+    private int calculerCreditsTotauxSemestre(Long semestreId) {
+        List<UniteEnseignement> ues = uniteEnseignementRepository.findBySemestreId(semestreId);
+        return ues.stream().mapToInt(UniteEnseignement::getCredits).sum();
     }
 }
