@@ -4,6 +4,7 @@ import com.academiq.entity.Evaluation;
 import com.academiq.entity.ModuleFormation;
 import com.academiq.entity.Note;
 import com.academiq.entity.TypeEvaluation;
+import com.academiq.entity.UniteEnseignement;
 import com.academiq.exception.ResourceNotFoundException;
 import com.academiq.repository.EvaluationRepository;
 import com.academiq.repository.InscriptionRepository;
@@ -141,5 +142,42 @@ public class CalculService {
         }
 
         return arrondir(moyenne, 2);
+    }
+
+    /**
+     * Calcule la moyenne d'un étudiant pour une UE (moyenne pondérée des modules).
+     *
+     * @return la moyenne arrondie à 2 décimales, ou null si aucun module n'a de note
+     */
+    public Double calculerMoyenneUE(Long etudiantId, Long ueId, Long promotionId) {
+        UniteEnseignement ue = uniteEnseignementRepository.findById(ueId)
+                .orElseThrow(() -> new ResourceNotFoundException("Unité d'enseignement", "id", ueId));
+
+        List<ModuleFormation> modules = moduleFormationRepository.findByUniteEnseignementId(ueId);
+
+        double sommeCoeff = 0;
+        double sommeValeurCoeff = 0;
+
+        for (ModuleFormation module : modules) {
+            Double moyenneModule = calculerMoyenneModule(etudiantId, module.getId(), promotionId);
+            if (moyenneModule != null) {
+                sommeValeurCoeff += moyenneModule * module.getCoefficient();
+                sommeCoeff += module.getCoefficient();
+            }
+        }
+
+        if (sommeCoeff == 0) {
+            return null;
+        }
+
+        return arrondir(sommeValeurCoeff / sommeCoeff, 2);
+    }
+
+    /**
+     * Vérifie si une UE est validée (moyenne >= 10/20).
+     */
+    public boolean isUEValidee(Long etudiantId, Long ueId, Long promotionId) {
+        Double moyenne = calculerMoyenneUE(etudiantId, ueId, promotionId);
+        return moyenne != null && moyenne >= 10.0;
     }
 }
