@@ -3,9 +3,11 @@ package com.academiq.controller;
 import com.academiq.dto.ApiResponse;
 import com.academiq.dto.note.EvaluationRequest;
 import com.academiq.dto.note.EvaluationResponse;
+import com.academiq.dto.note.NotePrepopuleeDTO;
 import com.academiq.dto.note.NoteResponse;
 import com.academiq.dto.note.NoteSaisieEnMasseRequest;
 import com.academiq.dto.note.NoteSaisieRequest;
+import com.academiq.dto.note.SaisieEnMasseResult;
 import com.academiq.entity.Evaluation;
 import com.academiq.entity.Note;
 import com.academiq.entity.Utilisateur;
@@ -13,6 +15,7 @@ import com.academiq.mapper.NoteMapper;
 import com.academiq.security.IsAdmin;
 import com.academiq.security.IsEnseignantOrAdmin;
 import com.academiq.service.NoteService;
+import com.academiq.service.SaisieEnMasseService;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -40,6 +43,7 @@ public class NoteController {
 
     private final NoteService noteService;
     private final NoteMapper noteMapper;
+    private final SaisieEnMasseService saisieEnMasseService;
 
     // ======================== Évaluations ========================
 
@@ -154,5 +158,26 @@ public class NoteController {
     public ResponseEntity<ApiResponse<NoteResponse>> getNote(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success(
                 noteMapper.toNoteResponse(noteService.getNoteById(id))));
+    }
+
+    // ======================== Saisie en masse améliorée ========================
+
+    @GetMapping("/evaluations/{evaluationId}/preparer-saisie")
+    @IsEnseignantOrAdmin
+    public ResponseEntity<ApiResponse<List<NotePrepopuleeDTO>>> preparerSaisie(
+            @PathVariable Long evaluationId) {
+        return ResponseEntity.ok(ApiResponse.success(
+                saisieEnMasseService.preparerSaisie(evaluationId)));
+    }
+
+    @PostMapping("/evaluations/{evaluationId}/saisie-classe")
+    @IsEnseignantOrAdmin
+    public ResponseEntity<ApiResponse<SaisieEnMasseResult>> saisirNotesClasse(
+            @PathVariable Long evaluationId,
+            @Valid @RequestBody List<com.academiq.dto.note.NoteSaisieDTO> notes,
+            @AuthenticationPrincipal Utilisateur utilisateur) {
+        SaisieEnMasseResult result = saisieEnMasseService.saisirNotesClasse(
+                evaluationId, notes, utilisateur.getId());
+        return ResponseEntity.ok(ApiResponse.success("Saisie en masse terminée", result));
     }
 }
