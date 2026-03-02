@@ -2,6 +2,7 @@ package com.academiq.service;
 
 import com.academiq.entity.DecisionJury;
 import com.academiq.entity.Evaluation;
+import com.academiq.entity.Mention;
 import com.academiq.entity.ModuleFormation;
 import com.academiq.entity.Note;
 import com.academiq.entity.TypeEvaluation;
@@ -317,5 +318,94 @@ public class CalculService {
         }
 
         return DecisionJury.AJOURNE;
+    }
+
+    /**
+     * Calcule séparément la moyenne CC et la note examen pour un module.
+     * Retourne un tableau [moyenneCC, noteExamen, moyenneModule] (chaque élément peut être null).
+     */
+    public Double[] calculerDetailsModule(Long etudiantId, Long moduleId, Long promotionId) {
+        ModuleFormation module = moduleFormationRepository.findById(moduleId)
+                .orElseThrow(() -> new ResourceNotFoundException("Module", "id", moduleId));
+
+        List<Evaluation> evaluations = evaluationRepository
+                .findByModuleFormationIdAndPromotionId(moduleId, promotionId);
+
+        double sommeCoeffCC = 0, sommeValeurCoeffCC = 0;
+        boolean hasCC = false;
+        double sommeCoeffExamen = 0, sommeValeurCoeffExamen = 0;
+        boolean hasExamen = false;
+        Double noteRattrapage = null;
+
+        for (Evaluation eval : evaluations) {
+            Note note = noteRepository.findByEtudiantIdAndEvaluationId(etudiantId, eval.getId())
+                    .orElse(null);
+            if (note == null) continue;
+
+            double valeur;
+            if (note.isAbsent() && note.getValeur() == null) {
+                valeur = 0;
+            } else if (note.getValeur() != null) {
+                valeur = (note.getValeur() / eval.getNoteMaximale()) * 20;
+            } else {
+                continue;
+            }
+
+            if (eval.getType() == TypeEvaluation.RATTRAPAGE) {
+                noteRattrapage = valeur;
+            } else if (TYPES_CC.contains(eval.getType())) {
+                sommeValeurCoeffCC += valeur * eval.getCoefficient();
+                sommeCoeffCC += eval.getCoefficient();
+                hasCC = true;
+            } else if (TYPES_EXAMEN.contains(eval.getType())) {
+                sommeValeurCoeffExamen += valeur * eval.getCoefficient();
+                sommeCoeffExamen += eval.getCoefficient();
+                hasExamen = true;
+            }
+        }
+
+        Double moyenneCC = hasCC ? arrondir(sommeValeurCoeffCC / sommeCoeffCC, 2) : null;
+
+        Double noteExamen;
+        if (hasExamen) {
+            noteExamen = arrondir(sommeValeurCoeffExamen / sommeCoeffExamen, 2);
+            if (noteRattrapage != null && noteRattrapage > noteExamen) {
+                noteExamen = arrondir(noteRattrapage, 2);
+            }
+        } else if (noteRattrapage != null) {
+            noteExamen = arrondir(noteRattrapage, 2);
+        } else {
+            noteExamen = null;
+        }
+
+        Double moyenneModule;
+        if (moyenneCC != null && noteExamen != null) {
+            moyenneModule = arrondir(
+                    moyenneCC * module.getPonderationCC() + noteExamen * module.getPonderationExamen(), 2);
+        } else if (moyenneCC != null) {
+            moyenneModule = moyenneCC;
+        } else if (noteExamen != null) {
+            moyenneModule = noteExamen;
+        } else {
+            moyenneModule = null;
+        }
+
+        return new Double[]{moyenneCC, noteExamen, moyenneModule};
+    }
+
+    /**
+     * Détermine la mention en fonction de la moyenne.
+     *
+     * @return la mention ou null si la moyenne est insuffisante (< 10)
+     */
+    public Mention determinerMention(Double moyenne) {
+        if (moyenne == null || moyenne < 10) {
+            return null;
+        }
+        if (moyenne >= 18) return Mention.EXCELLENT;
+        if (moyenne >= 16) return Mention.TRES_BIEN;
+        if (moyenne >= 14) return Mention.BIEN;
+        if (moyenne >= 12) return Mention.ASSEZ_BIEN;
+        return Mention.PASSABLE;
     }
 }
