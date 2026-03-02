@@ -8,6 +8,7 @@ import com.academiq.dto.note.HistoriqueNoteResponse;
 import com.academiq.dto.note.NoteResponse;
 import com.academiq.dto.note.RecapitulatifEtudiantDTO;
 import com.academiq.dto.note.RecapitulatifModuleDTO;
+import com.academiq.dto.note.StatistiquesEvaluationDTO;
 import com.academiq.dto.note.NoteSaisieEnMasseRequest;
 import com.academiq.dto.note.NoteSaisieRequest;
 import com.academiq.dto.note.SaisieEnMasseResult;
@@ -173,6 +174,16 @@ public class NoteController {
     public ResponseEntity<ApiResponse<NoteResponse>> getNote(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success(
                 noteMapper.toNoteResponse(noteService.getNoteById(id))));
+    }
+
+    // ======================== Statistiques ========================
+
+    @GetMapping("/evaluations/{id}/statistiques")
+    @IsEnseignantOrAdmin
+    public ResponseEntity<ApiResponse<StatistiquesEvaluationDTO>> getStatistiquesEvaluation(
+            @PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.success(
+                noteService.getStatistiquesEvaluation(id)));
     }
 
     // ======================== Verrouillage ========================

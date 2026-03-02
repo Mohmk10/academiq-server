@@ -6,6 +6,7 @@ import com.academiq.dto.note.NoteDetailDTO;
 import com.academiq.dto.note.NoteSaisieDTO;
 import com.academiq.dto.note.RecapitulatifEtudiantDTO;
 import com.academiq.dto.note.RecapitulatifModuleDTO;
+import com.academiq.dto.note.StatistiquesEvaluationDTO;
 import com.academiq.entity.Evaluation;
 import com.academiq.entity.Etudiant;
 import com.academiq.entity.Inscription;
@@ -34,7 +35,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.EnumSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -356,6 +359,113 @@ public class NoteService {
                 .promotionNom(promotion.getNom())
                 .modules(modulesDTO)
                 .build();
+    }
+
+    public StatistiquesEvaluationDTO getStatistiquesEvaluation(Long evaluationId) {
+        Evaluation evaluation = getEvaluationById(evaluationId);
+
+        List<Note> toutesNotes = noteRepository.findByEvaluationId(evaluationId);
+        List<Double> valeurs = toutesNotes.stream()
+                .filter(n -> !n.isAbsent() && n.getValeur() != null)
+                .map(Note::getValeur)
+                .sorted()
+                .toList();
+
+        long nombreAbsents = toutesNotes.stream().filter(Note::isAbsent).count();
+        long nombreInscrits = inscriptionRepository.countByPromotionId(evaluation.getPromotion().getId());
+
+        Double moyenne = null;
+        Double mediane = null;
+        Double ecartType = null;
+        Double noteMin = null;
+        Double noteMax = null;
+        Double tauxReussite = null;
+
+        if (!valeurs.isEmpty()) {
+            double somme = valeurs.stream().mapToDouble(Double::doubleValue).sum();
+            double moy = somme / valeurs.size();
+            moyenne = moy;
+
+            int taille = valeurs.size();
+            if (taille % 2 == 0) {
+                mediane = (valeurs.get(taille / 2 - 1) + valeurs.get(taille / 2)) / 2.0;
+            } else {
+                mediane = valeurs.get(taille / 2);
+            }
+
+            double sommeCarre = valeurs.stream()
+                    .mapToDouble(v -> Math.pow(v - moy, 2))
+                    .sum();
+            ecartType = Math.sqrt(sommeCarre / valeurs.size());
+
+            noteMin = valeurs.get(0);
+            noteMax = valeurs.get(valeurs.size() - 1);
+
+            double seuilReussite = evaluation.getNoteMaximale() / 2.0;
+            long reussis = valeurs.stream().filter(v -> v >= seuilReussite).count();
+            tauxReussite = (reussis * 100.0) / valeurs.size();
+        }
+
+        Map<String, Long> distribution = calculerDistribution(valeurs, evaluation.getNoteMaximale());
+
+        return StatistiquesEvaluationDTO.builder()
+                .evaluationId(evaluation.getId())
+                .evaluationNom(evaluation.getNom())
+                .type(evaluation.getType().name())
+                .moyenne(moyenne)
+                .mediane(mediane)
+                .ecartType(ecartType)
+                .noteMin(noteMin)
+                .noteMax(noteMax)
+                .nombreNotes(valeurs.size())
+                .nombreAbsents(nombreAbsents)
+                .nombreInscrits(nombreInscrits)
+                .tauxReussite(tauxReussite)
+                .distribution(distribution)
+                .build();
+    }
+
+    private Map<String, Long> calculerDistribution(List<Double> valeurs, double noteMaximale) {
+        Map<String, Long> distribution = new LinkedHashMap<>();
+
+        if (noteMaximale == 20.0) {
+            distribution.put("0-4", 0L);
+            distribution.put("4-8", 0L);
+            distribution.put("8-10", 0L);
+            distribution.put("10-12", 0L);
+            distribution.put("12-14", 0L);
+            distribution.put("14-16", 0L);
+            distribution.put("16-20", 0L);
+
+            for (Double v : valeurs) {
+                if (v < 4) distribution.merge("0-4", 1L, Long::sum);
+                else if (v < 8) distribution.merge("4-8", 1L, Long::sum);
+                else if (v < 10) distribution.merge("8-10", 1L, Long::sum);
+                else if (v < 12) distribution.merge("10-12", 1L, Long::sum);
+                else if (v < 14) distribution.merge("12-14", 1L, Long::sum);
+                else if (v < 16) distribution.merge("14-16", 1L, Long::sum);
+                else distribution.merge("16-20", 1L, Long::sum);
+            }
+        } else {
+            int nbTranches = 5;
+            double tailleTranche = noteMaximale / nbTranches;
+            for (int i = 0; i < nbTranches; i++) {
+                double debut = i * tailleTranche;
+                double fin = (i + 1) * tailleTranche;
+                String cle = String.format("%.0f-%.0f", debut, fin);
+                distribution.put(cle, 0L);
+            }
+            for (Double v : valeurs) {
+                int index = (int) (v / tailleTranche);
+                if (index >= nbTranches) index = nbTranches - 1;
+                double debut = index * tailleTranche;
+                double fin = (index + 1) * tailleTranche;
+                String cle = String.format("%.0f-%.0f", debut, fin);
+                distribution.merge(cle, 1L, Long::sum);
+            }
+        }
+
+        return distribution;
     }
 
     private Double calculerMoyenneModule(List<Note> notes, ModuleFormation module,
