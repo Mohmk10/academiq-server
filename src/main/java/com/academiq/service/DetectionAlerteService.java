@@ -45,6 +45,7 @@ public class DetectionAlerteService {
     private final CalculService calculService;
     private final InscriptionRepository inscriptionRepository;
     private final EtudiantRepository etudiantRepository;
+    private final NotificationService notificationService;
 
     private static final Set<TypeEvaluation> TYPES_EXAMEN = EnumSet.of(
             TypeEvaluation.EXAMEN, TypeEvaluation.PARTIEL);
@@ -238,6 +239,7 @@ public class DetectionAlerteService {
         }
 
         List<Alerte> sauvegardees = alerteRepository.saveAll(toutesAlertes);
+        sauvegardees.forEach(notificationService::notifierAlerte);
         log.info("Analyse étudiant {} : {} alertes générées", etudiantId, sauvegardees.size());
         return sauvegardees;
     }
