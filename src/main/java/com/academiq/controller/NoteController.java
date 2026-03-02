@@ -1,0 +1,158 @@
+package com.academiq.controller;
+
+import com.academiq.dto.ApiResponse;
+import com.academiq.dto.note.EvaluationRequest;
+import com.academiq.dto.note.EvaluationResponse;
+import com.academiq.dto.note.NoteResponse;
+import com.academiq.dto.note.NoteSaisieEnMasseRequest;
+import com.academiq.dto.note.NoteSaisieRequest;
+import com.academiq.entity.Evaluation;
+import com.academiq.entity.Note;
+import com.academiq.entity.Utilisateur;
+import com.academiq.mapper.NoteMapper;
+import com.academiq.security.IsAdmin;
+import com.academiq.security.IsEnseignantOrAdmin;
+import com.academiq.service.NoteService;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
+
+@RestController
+@RequestMapping("/notes")
+@RequiredArgsConstructor
+@Tag(name = "Notes & Évaluations", description = "Gestion des notes et évaluations")
+public class NoteController {
+
+    private final NoteService noteService;
+    private final NoteMapper noteMapper;
+
+    // ======================== Évaluations ========================
+
+    @PostMapping("/evaluations")
+    @IsEnseignantOrAdmin
+    public ResponseEntity<ApiResponse<EvaluationResponse>> creerEvaluation(
+            @Valid @RequestBody EvaluationRequest request) {
+        Evaluation evaluation = noteService.createEvaluation(noteMapper.toEvaluation(request));
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success("Évaluation créée avec succès", noteMapper.toEvaluationResponse(evaluation)));
+    }
+
+    @GetMapping("/evaluations/module/{moduleId}")
+    @IsEnseignantOrAdmin
+    public ResponseEntity<ApiResponse<List<EvaluationResponse>>> getEvaluationsParModule(
+            @PathVariable Long moduleId) {
+        return ResponseEntity.ok(ApiResponse.success(
+                noteMapper.toEvaluationResponseList(noteService.getEvaluationsByModule(moduleId))));
+    }
+
+    @GetMapping("/evaluations/module/{moduleId}/promotion/{promotionId}")
+    @IsEnseignantOrAdmin
+    public ResponseEntity<ApiResponse<List<EvaluationResponse>>> getEvaluationsParModuleEtPromotion(
+            @PathVariable Long moduleId, @PathVariable Long promotionId) {
+        return ResponseEntity.ok(ApiResponse.success(
+                noteMapper.toEvaluationResponseList(noteService.getEvaluationsByModuleAndPromotion(moduleId, promotionId))));
+    }
+
+    @GetMapping("/evaluations/{id}")
+    @IsEnseignantOrAdmin
+    public ResponseEntity<ApiResponse<EvaluationResponse>> getEvaluation(@PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.success(
+                noteMapper.toEvaluationResponse(noteService.getEvaluationById(id))));
+    }
+
+    @PutMapping("/evaluations/{id}")
+    @IsEnseignantOrAdmin
+    public ResponseEntity<ApiResponse<EvaluationResponse>> modifierEvaluation(
+            @PathVariable Long id, @Valid @RequestBody EvaluationRequest request) {
+        Evaluation data = noteMapper.toEvaluation(request);
+        Evaluation updated = noteService.updateEvaluation(id, data);
+        return ResponseEntity.ok(ApiResponse.success("Évaluation modifiée avec succès",
+                noteMapper.toEvaluationResponse(updated)));
+    }
+
+    @DeleteMapping("/evaluations/{id}")
+    @IsAdmin
+    public ResponseEntity<ApiResponse<Void>> supprimerEvaluation(@PathVariable Long id) {
+        noteService.deleteEvaluation(id);
+        return ResponseEntity.ok(ApiResponse.success("Évaluation supprimée avec succès"));
+    }
+
+    @PatchMapping("/evaluations/{id}/terminer")
+    @IsEnseignantOrAdmin
+    public ResponseEntity<ApiResponse<Void>> terminerSaisie(@PathVariable Long id) {
+        noteService.terminerSaisie(id);
+        return ResponseEntity.ok(ApiResponse.success("Saisie terminée avec succès"));
+    }
+
+    // ======================== Notes ========================
+
+    @PostMapping("/saisir")
+    @IsEnseignantOrAdmin
+    public ResponseEntity<ApiResponse<NoteResponse>> saisirNote(
+            @Valid @RequestBody NoteSaisieRequest request,
+            @AuthenticationPrincipal Utilisateur utilisateur) {
+        Note note = noteService.saisirNote(
+                request.getEvaluationId(), request.getEtudiantId(),
+                request.getValeur(), request.isAbsent(),
+                request.getCommentaire(), utilisateur.getId());
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success("Note saisie avec succès", noteMapper.toNoteResponse(note)));
+    }
+
+    @PostMapping("/saisir-en-masse")
+    @IsEnseignantOrAdmin
+    public ResponseEntity<ApiResponse<List<NoteResponse>>> saisirNotesEnMasse(
+            @Valid @RequestBody NoteSaisieEnMasseRequest request,
+            @AuthenticationPrincipal Utilisateur utilisateur) {
+        List<Note> notes = noteService.saisirNotesEnMasse(
+                request.getEvaluationId(), request.getNotes(), utilisateur.getId());
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success("Notes saisies avec succès", noteMapper.toNoteResponseList(notes)));
+    }
+
+    @GetMapping("/evaluation/{evaluationId}")
+    @IsEnseignantOrAdmin
+    public ResponseEntity<ApiResponse<List<NoteResponse>>> getNotesByEvaluation(
+            @PathVariable Long evaluationId) {
+        return ResponseEntity.ok(ApiResponse.success(
+                noteMapper.toNoteResponseList(noteService.getNotesByEvaluation(evaluationId))));
+    }
+
+    @GetMapping("/etudiant/{etudiantId}")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<List<NoteResponse>>> getNotesByEtudiant(
+            @PathVariable Long etudiantId) {
+        return ResponseEntity.ok(ApiResponse.success(
+                noteMapper.toNoteResponseList(noteService.getNotesByEtudiant(etudiantId))));
+    }
+
+    @GetMapping("/etudiant/{etudiantId}/module/{moduleId}")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<List<NoteResponse>>> getNotesByEtudiantAndModule(
+            @PathVariable Long etudiantId, @PathVariable Long moduleId) {
+        return ResponseEntity.ok(ApiResponse.success(
+                noteMapper.toNoteResponseList(noteService.getNotesByEtudiantAndModule(etudiantId, moduleId))));
+    }
+
+    @GetMapping("/{id}")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<NoteResponse>> getNote(@PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.success(
+                noteMapper.toNoteResponse(noteService.getNoteById(id))));
+    }
+}
