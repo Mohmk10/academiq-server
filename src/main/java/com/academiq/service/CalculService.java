@@ -1,5 +1,10 @@
 package com.academiq.service;
 
+import com.academiq.entity.Evaluation;
+import com.academiq.entity.ModuleFormation;
+import com.academiq.entity.Note;
+import com.academiq.entity.TypeEvaluation;
+import com.academiq.exception.ResourceNotFoundException;
 import com.academiq.repository.EvaluationRepository;
 import com.academiq.repository.InscriptionRepository;
 import com.academiq.repository.ModuleFormationRepository;
@@ -14,6 +19,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.EnumSet;
+import java.util.List;
+import java.util.Set;
 
 /**
  * Service centralisé pour tous les calculs académiques :
@@ -33,6 +41,12 @@ public class CalculService {
     private final SemestreRepository semestreRepository;
     private final InscriptionRepository inscriptionRepository;
 
+    private static final Set<TypeEvaluation> TYPES_CC = EnumSet.of(
+            TypeEvaluation.CC, TypeEvaluation.TP, TypeEvaluation.PROJET, TypeEvaluation.ORAL);
+
+    private static final Set<TypeEvaluation> TYPES_EXAMEN = EnumSet.of(
+            TypeEvaluation.EXAMEN, TypeEvaluation.PARTIEL);
+
     /**
      * Arrondit une valeur au nombre de décimales spécifié (arrondi demi-supérieur).
      */
@@ -40,5 +54,92 @@ public class CalculService {
         return BigDecimal.valueOf(valeur)
                 .setScale(decimales, RoundingMode.HALF_UP)
                 .doubleValue();
+    }
+
+    /**
+     * Calcule la moyenne d'un étudiant pour un module donné dans une promotion.
+     * Applique la pondération CC/Examen définie sur le module.
+     *
+     * @return la moyenne arrondie à 2 décimales, ou null si aucune note
+     */
+    public Double calculerMoyenneModule(Long etudiantId, Long moduleId, Long promotionId) {
+        ModuleFormation module = moduleFormationRepository.findById(moduleId)
+                .orElseThrow(() -> new ResourceNotFoundException("Module", "id", moduleId));
+
+        List<Evaluation> evaluations = evaluationRepository
+                .findByModuleFormationIdAndPromotionId(moduleId, promotionId);
+
+        if (evaluations.isEmpty()) {
+            return null;
+        }
+
+        double sommeCoeffCC = 0;
+        double sommeValeurCoeffCC = 0;
+        boolean hasCC = false;
+
+        double sommeCoeffExamen = 0;
+        double sommeValeurCoeffExamen = 0;
+        boolean hasExamen = false;
+
+        Double noteRattrapage = null;
+        double coeffRattrapage = 0;
+
+        for (Evaluation eval : evaluations) {
+            Note note = noteRepository.findByEtudiantIdAndEvaluationId(etudiantId, eval.getId())
+                    .orElse(null);
+
+            if (note == null) continue;
+
+            double valeur;
+            if (note.isAbsent() && note.getValeur() == null) {
+                valeur = 0;
+            } else if (note.getValeur() != null) {
+                valeur = (note.getValeur() / eval.getNoteMaximale()) * 20;
+            } else {
+                continue;
+            }
+
+            if (eval.getType() == TypeEvaluation.RATTRAPAGE) {
+                noteRattrapage = valeur;
+                coeffRattrapage = eval.getCoefficient();
+            } else if (TYPES_CC.contains(eval.getType())) {
+                sommeValeurCoeffCC += valeur * eval.getCoefficient();
+                sommeCoeffCC += eval.getCoefficient();
+                hasCC = true;
+            } else if (TYPES_EXAMEN.contains(eval.getType())) {
+                sommeValeurCoeffExamen += valeur * eval.getCoefficient();
+                sommeCoeffExamen += eval.getCoefficient();
+                hasExamen = true;
+            }
+        }
+
+        if (!hasCC && !hasExamen && noteRattrapage == null) {
+            return null;
+        }
+
+        Double moyenneCC = hasCC ? sommeValeurCoeffCC / sommeCoeffCC : null;
+
+        Double noteExamen;
+        if (hasExamen) {
+            noteExamen = sommeValeurCoeffExamen / sommeCoeffExamen;
+            if (noteRattrapage != null && noteRattrapage > noteExamen) {
+                noteExamen = noteRattrapage;
+            }
+        } else if (noteRattrapage != null) {
+            noteExamen = noteRattrapage;
+        } else {
+            noteExamen = null;
+        }
+
+        double moyenne;
+        if (moyenneCC != null && noteExamen != null) {
+            moyenne = moyenneCC * module.getPonderationCC() + noteExamen * module.getPonderationExamen();
+        } else if (moyenneCC != null) {
+            moyenne = moyenneCC;
+        } else {
+            moyenne = noteExamen;
+        }
+
+        return arrondir(moyenne, 2);
     }
 }
