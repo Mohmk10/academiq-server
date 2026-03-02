@@ -252,4 +252,40 @@ public class CalculService {
         List<UniteEnseignement> ues = uniteEnseignementRepository.findBySemestreId(semestreId);
         return ues.stream().mapToInt(UniteEnseignement::getCredits).sum();
     }
+
+    /**
+     * Calcule le nombre de crédits ECTS validés pour un semestre.
+     * Une UE est validée si sa moyenne est >= 10/20.
+     */
+    public int calculerCreditsValides(Long etudiantId, Long semestreId, Long promotionId) {
+        List<UniteEnseignement> ues = uniteEnseignementRepository.findBySemestreId(semestreId);
+        int credits = 0;
+        for (UniteEnseignement ue : ues) {
+            if (isUEValidee(etudiantId, ue.getId(), promotionId)) {
+                credits += ue.getCredits();
+            }
+        }
+        return credits;
+    }
+
+    /**
+     * Calcule le total des crédits validés sur l'ensemble des semestres d'un niveau.
+     */
+    public int calculerCreditsAnnuels(Long etudiantId, Long niveauId, Long promotionId) {
+        List<Semestre> semestres = semestreRepository.findByNiveauId(niveauId);
+        int total = 0;
+        for (Semestre semestre : semestres) {
+            total += calculerCreditsValides(etudiantId, semestre.getId(), promotionId);
+        }
+        return total;
+    }
+
+    /**
+     * Retourne le nombre de crédits requis pour valider un niveau.
+     */
+    public int calculerCreditsTotauxRequis(Long niveauId) {
+        Niveau niveau = niveauRepository.findById(niveauId)
+                .orElseThrow(() -> new ResourceNotFoundException("Niveau", "id", niveauId));
+        return niveau.getCreditsRequis();
+    }
 }
