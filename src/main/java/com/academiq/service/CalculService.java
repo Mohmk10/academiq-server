@@ -4,6 +4,7 @@ import com.academiq.entity.Evaluation;
 import com.academiq.entity.ModuleFormation;
 import com.academiq.entity.Note;
 import com.academiq.entity.TypeEvaluation;
+import com.academiq.entity.Semestre;
 import com.academiq.entity.UniteEnseignement;
 import com.academiq.exception.ResourceNotFoundException;
 import com.academiq.repository.EvaluationRepository;
@@ -179,5 +180,34 @@ public class CalculService {
     public boolean isUEValidee(Long etudiantId, Long ueId, Long promotionId) {
         Double moyenne = calculerMoyenneUE(etudiantId, ueId, promotionId);
         return moyenne != null && moyenne >= 10.0;
+    }
+
+    /**
+     * Calcule la moyenne semestrielle (moyenne pondérée des UEs par leurs coefficients).
+     *
+     * @return la moyenne arrondie à 2 décimales, ou null si aucune UE n'a de note
+     */
+    public Double calculerMoyenneSemestre(Long etudiantId, Long semestreId, Long promotionId) {
+        Semestre semestre = semestreRepository.findById(semestreId)
+                .orElseThrow(() -> new ResourceNotFoundException("Semestre", "id", semestreId));
+
+        List<UniteEnseignement> ues = uniteEnseignementRepository.findBySemestreId(semestreId);
+
+        double sommeCoeff = 0;
+        double sommeValeurCoeff = 0;
+
+        for (UniteEnseignement ue : ues) {
+            Double moyenneUE = calculerMoyenneUE(etudiantId, ue.getId(), promotionId);
+            if (moyenneUE != null) {
+                sommeValeurCoeff += moyenneUE * ue.getCoefficient();
+                sommeCoeff += ue.getCoefficient();
+            }
+        }
+
+        if (sommeCoeff == 0) {
+            return null;
+        }
+
+        return arrondir(sommeValeurCoeff / sommeCoeff, 2);
     }
 }
