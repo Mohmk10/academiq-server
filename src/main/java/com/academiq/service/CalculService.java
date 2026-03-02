@@ -1,5 +1,6 @@
 package com.academiq.service;
 
+import com.academiq.entity.DecisionJury;
 import com.academiq.entity.Evaluation;
 import com.academiq.entity.ModuleFormation;
 import com.academiq.entity.Note;
@@ -287,5 +288,34 @@ public class CalculService {
         Niveau niveau = niveauRepository.findById(niveauId)
                 .orElseThrow(() -> new ResourceNotFoundException("Niveau", "id", niveauId));
         return niveau.getCreditsRequis();
+    }
+
+    /**
+     * Détermine la décision du jury pour un étudiant à un niveau donné.
+     * Basée sur la moyenne annuelle et les crédits validés.
+     */
+    public DecisionJury determinerDecision(Long etudiantId, Long niveauId, Long promotionId) {
+        Double moyenne = calculerMoyenneAnnuelle(etudiantId, niveauId, promotionId);
+
+        if (moyenne == null) {
+            return DecisionJury.EN_ATTENTE;
+        }
+
+        int creditsValides = calculerCreditsAnnuels(etudiantId, niveauId, promotionId);
+        int creditsRequis = calculerCreditsTotauxRequis(niveauId);
+
+        if (moyenne >= 10 && creditsValides >= creditsRequis) {
+            return DecisionJury.ADMIS;
+        }
+
+        if (moyenne >= 10 && creditsRequis > 0 && creditsValides >= (creditsRequis * 0.8)) {
+            return DecisionJury.ADMIS_COMPENSATION;
+        }
+
+        if (moyenne >= 8) {
+            return DecisionJury.RATTRAPAGE;
+        }
+
+        return DecisionJury.AJOURNE;
     }
 }
