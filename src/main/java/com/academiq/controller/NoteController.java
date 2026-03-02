@@ -4,6 +4,7 @@ import com.academiq.dto.ApiResponse;
 import com.academiq.dto.note.EvaluationRequest;
 import com.academiq.dto.note.EvaluationResponse;
 import com.academiq.dto.note.NotePrepopuleeDTO;
+import com.academiq.dto.note.HistoriqueNoteResponse;
 import com.academiq.dto.note.NoteResponse;
 import com.academiq.dto.note.NoteSaisieEnMasseRequest;
 import com.academiq.dto.note.NoteSaisieRequest;
@@ -14,6 +15,7 @@ import com.academiq.entity.Utilisateur;
 import com.academiq.mapper.NoteMapper;
 import com.academiq.security.IsAdmin;
 import com.academiq.security.IsEnseignantOrAdmin;
+import com.academiq.service.HistoriqueNoteService;
 import com.academiq.service.NoteService;
 import com.academiq.service.SaisieEnMasseService;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -44,6 +46,7 @@ public class NoteController {
     private final NoteService noteService;
     private final NoteMapper noteMapper;
     private final SaisieEnMasseService saisieEnMasseService;
+    private final HistoriqueNoteService historiqueNoteService;
 
     // ======================== Évaluations ========================
 
@@ -158,6 +161,30 @@ public class NoteController {
     public ResponseEntity<ApiResponse<NoteResponse>> getNote(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success(
                 noteMapper.toNoteResponse(noteService.getNoteById(id))));
+    }
+
+    // ======================== Historique ========================
+
+    @GetMapping("/{noteId}/historique")
+    @IsEnseignantOrAdmin
+    public ResponseEntity<ApiResponse<List<HistoriqueNoteResponse>>> getHistoriqueNote(
+            @PathVariable Long noteId) {
+        var historiques = historiqueNoteService.getHistoriqueByNote(noteId);
+        List<HistoriqueNoteResponse> responses = historiques.stream()
+                .map(h -> HistoriqueNoteResponse.builder()
+                        .id(h.getId())
+                        .ancienneValeur(h.getAncienneValeur())
+                        .nouvelleValeur(h.getNouvelleValeur())
+                        .ancienAbsent(h.isAncienAbsent())
+                        .nouveauAbsent(h.isNouveauAbsent())
+                        .motifModification(h.getMotifModification())
+                        .modifieParNom(h.getModifiePar() != null
+                                ? h.getModifiePar().getPrenom() + " " + h.getModifiePar().getNom()
+                                : null)
+                        .dateModification(h.getDateModification())
+                        .build())
+                .toList();
+        return ResponseEntity.ok(ApiResponse.success(responses));
     }
 
     // ======================== Saisie en masse améliorée ========================

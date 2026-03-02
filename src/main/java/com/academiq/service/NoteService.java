@@ -41,6 +41,7 @@ public class NoteService {
     private final ModuleFormationRepository moduleFormationRepository;
     private final PromotionRepository promotionRepository;
     private final NoteValidationService noteValidationService;
+    private final HistoriqueNoteService historiqueNoteService;
 
     // ======================== Évaluations ========================
 
@@ -140,6 +141,8 @@ public class NoteService {
 
         if (existingNote.isPresent()) {
             note = existingNote.get();
+            historiqueNoteService.enregistrerModification(
+                    note, note.getValeur(), note.isAbsent(), saisiParId, commentaire);
             note.setAncienneValeur(note.getValeur());
             note.setValeur(valeur);
             note.setAbsent(absent);
