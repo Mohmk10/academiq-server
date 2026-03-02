@@ -4,6 +4,12 @@ import com.academiq.dto.calcul.BulletinEtudiantDTO;
 import com.academiq.dto.calcul.BulletinModuleDTO;
 import com.academiq.dto.calcul.BulletinSemestreDTO;
 import com.academiq.dto.calcul.BulletinUeDTO;
+import com.academiq.entity.DecisionJury;
+import com.academiq.entity.Etudiant;
+import com.academiq.entity.Promotion;
+import com.academiq.entity.Utilisateur;
+import com.academiq.exception.BadRequestException;
+import com.academiq.exception.ResourceNotFoundException;
 import com.academiq.repository.EtudiantRepository;
 import com.academiq.repository.InscriptionRepository;
 import com.academiq.repository.NiveauRepository;
@@ -77,6 +83,152 @@ public class PdfService {
             return baos.toByteArray();
         } catch (Exception e) {
             log.error("Erreur lors de la génération du relevé de notes", e);
+            throw new RuntimeException("Erreur lors de la génération du PDF", e);
+        }
+    }
+
+    public byte[] genererAttestation(Long etudiantId, Long promotionId) {
+        BulletinEtudiantDTO bulletin = bulletinService.genererBulletin(etudiantId, promotionId);
+
+        String decision = bulletin.getDecision();
+        if (!DecisionJury.ADMIS.name().equals(decision)
+                && !DecisionJury.ADMIS_COMPENSATION.name().equals(decision)) {
+            throw new BadRequestException("L'étudiant n'est pas admis, attestation impossible");
+        }
+
+        Etudiant etudiant = etudiantRepository.findById(etudiantId)
+                .orElseThrow(() -> new ResourceNotFoundException("Étudiant", "id", etudiantId));
+        Utilisateur utilisateur = etudiant.getUtilisateur();
+
+        try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
+            Document document = new Document(PageSize.A4, 60, 60, 50, 50);
+            PdfWriter writer = PdfWriter.getInstance(document, baos);
+            ajouterPiedDePage(writer);
+            document.open();
+
+            Paragraph institut = new Paragraph("NATIONAL INSTITUTE OF INFORMATION TECHNOLOGY",
+                    FontFactory.getFont(FontFactory.HELVETICA_BOLD, 14, Font.BOLD, new Color(0, 51, 102)));
+            institut.setAlignment(Element.ALIGN_CENTER);
+            document.add(institut);
+
+            Paragraph niit = new Paragraph("NIIT SÉNÉGAL",
+                    FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12, Font.BOLD, new Color(0, 51, 102)));
+            niit.setAlignment(Element.ALIGN_CENTER);
+            document.add(niit);
+
+            PdfStyleHelper.addEmptyLine(document, 1);
+
+            PdfPTable separateur = new PdfPTable(1);
+            separateur.setWidthPercentage(100);
+            PdfPCell cellSep = new PdfPCell();
+            cellSep.setBorderWidthTop(2);
+            cellSep.setBorderWidthBottom(0);
+            cellSep.setBorderWidthLeft(0);
+            cellSep.setBorderWidthRight(0);
+            cellSep.setBorderColorTop(new Color(0, 51, 102));
+            cellSep.setFixedHeight(3);
+            separateur.addCell(cellSep);
+            document.add(separateur);
+
+            PdfStyleHelper.addEmptyLine(document, 2);
+
+            Paragraph titre = new Paragraph("ATTESTATION DE RÉUSSITE",
+                    FontFactory.getFont(FontFactory.HELVETICA_BOLD, 20, Font.BOLD, new Color(0, 51, 102)));
+            titre.setAlignment(Element.ALIGN_CENTER);
+            document.add(titre);
+
+            PdfStyleHelper.addEmptyLine(document, 2);
+
+            String dateNaissance = utilisateur.getDateNaissance() != null
+                    ? utilisateur.getDateNaissance().format(DATE_FORMATTER)
+                    : "non renseignée";
+
+            String corps = String.format(
+                    "Le Directeur des Études de NIIT Sénégal atteste que l'étudiant(e) %s %s, " +
+                    "matricule %s, né(e) le %s a satisfait aux conditions requises pour la validation " +
+                    "du niveau %s de la filière %s au titre de l'année universitaire %s.",
+                    utilisateur.getPrenom(),
+                    utilisateur.getNom().toUpperCase(),
+                    etudiant.getMatricule(),
+                    dateNaissance,
+                    bulletin.getNiveauNom(),
+                    bulletin.getFiliereNom(),
+                    bulletin.getAnneeUniversitaire());
+
+            Paragraph paragrapheCorps = new Paragraph(corps, PdfStyleHelper.getNormalFont());
+            paragrapheCorps.setAlignment(Element.ALIGN_JUSTIFIED);
+            paragrapheCorps.setLeading(18);
+            document.add(paragrapheCorps);
+
+            PdfStyleHelper.addEmptyLine(document, 1);
+
+            Paragraph titreResultats = new Paragraph("Résultats :", PdfStyleHelper.getBoldFont());
+            titreResultats.setSpacingAfter(5);
+            document.add(titreResultats);
+
+            Paragraph moyenneLine = new Paragraph(
+                    "      Moyenne générale : " + formatNote(bulletin.getMoyenneAnnuelle()) + " / 20",
+                    PdfStyleHelper.getNormalFont());
+            document.add(moyenneLine);
+
+            if (bulletin.getMention() != null) {
+                Paragraph mentionLine = new Paragraph(
+                        "      Mention : " + bulletin.getMention(), PdfStyleHelper.getNormalFont());
+                document.add(mentionLine);
+            }
+
+            Paragraph creditsLine = new Paragraph(
+                    "      Crédits ECTS validés : " + bulletin.getCreditsValides()
+                            + " / " + bulletin.getCreditsTotaux(),
+                    PdfStyleHelper.getNormalFont());
+            document.add(creditsLine);
+
+            PdfStyleHelper.addEmptyLine(document, 1);
+
+            Paragraph cloture = new Paragraph(
+                    "En foi de quoi, la présente attestation lui est délivrée pour servir et valoir ce que de droit.",
+                    PdfStyleHelper.getNormalFont());
+            cloture.setAlignment(Element.ALIGN_JUSTIFIED);
+            cloture.setLeading(18);
+            document.add(cloture);
+
+            PdfStyleHelper.addEmptyLine(document, 2);
+
+            Paragraph lieu = new Paragraph(
+                    "Fait à Dakar, le " + LocalDate.now().format(DATE_FORMATTER),
+                    PdfStyleHelper.getNormalFont());
+            lieu.setAlignment(Element.ALIGN_RIGHT);
+            document.add(lieu);
+
+            PdfStyleHelper.addEmptyLine(document, 3);
+
+            Paragraph signataire = new Paragraph("Le Directeur des Études",
+                    PdfStyleHelper.getBoldFont());
+            signataire.setAlignment(Element.ALIGN_RIGHT);
+            document.add(signataire);
+
+            PdfStyleHelper.addEmptyLine(document, 1);
+
+            Paragraph ligneSignature = new Paragraph("_________________________",
+                    PdfStyleHelper.getNormalFont());
+            ligneSignature.setAlignment(Element.ALIGN_RIGHT);
+            document.add(ligneSignature);
+
+            PdfStyleHelper.addEmptyLine(document, 2);
+
+            Paragraph avertissement = new Paragraph(
+                    "Ce document ne remplace pas le diplôme officiel.",
+                    FontFactory.getFont(FontFactory.HELVETICA_OBLIQUE, 8, Font.ITALIC, Color.GRAY));
+            avertissement.setAlignment(Element.ALIGN_CENTER);
+            document.add(avertissement);
+
+            document.close();
+            log.info("Attestation de réussite générée pour l'étudiant {}", etudiantId);
+            return baos.toByteArray();
+        } catch (BadRequestException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("Erreur lors de la génération de l'attestation", e);
             throw new RuntimeException("Erreur lors de la génération du PDF", e);
         }
     }
