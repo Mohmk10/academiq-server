@@ -6,6 +6,7 @@ import com.academiq.dto.note.EvaluationResponse;
 import com.academiq.dto.note.NotePrepopuleeDTO;
 import com.academiq.dto.note.HistoriqueNoteResponse;
 import com.academiq.dto.note.NoteResponse;
+import com.academiq.dto.note.RecapitulatifModuleDTO;
 import com.academiq.dto.note.NoteSaisieEnMasseRequest;
 import com.academiq.dto.note.NoteSaisieRequest;
 import com.academiq.dto.note.SaisieEnMasseResult;
@@ -232,6 +233,16 @@ public class NoteController {
         SaisieEnMasseResult result = saisieEnMasseService.saisirNotesClasse(
                 evaluationId, notes, utilisateur.getId());
         return ResponseEntity.ok(ApiResponse.success("Saisie en masse terminée", result));
+    }
+
+    // ======================== Récapitulatifs ========================
+
+    @GetMapping("/modules/{moduleId}/promotion/{promotionId}/recapitulatif")
+    @IsEnseignantOrAdmin
+    public ResponseEntity<ApiResponse<RecapitulatifModuleDTO>> getRecapitulatifModule(
+            @PathVariable Long moduleId, @PathVariable Long promotionId) {
+        return ResponseEntity.ok(ApiResponse.success(
+                noteService.getRecapitulatifModule(moduleId, promotionId)));
     }
 
     // ======================== Import/Export Excel ========================

@@ -1,8 +1,11 @@
 package com.academiq.service;
 
+import com.academiq.dto.note.EvaluationRecapDTO;
 import com.academiq.dto.note.NoteSaisieDTO;
+import com.academiq.dto.note.RecapitulatifModuleDTO;
 import com.academiq.entity.Evaluation;
 import com.academiq.entity.Etudiant;
+import com.academiq.entity.ModuleFormation;
 import com.academiq.entity.Note;
 import com.academiq.entity.StatutEvaluation;
 import com.academiq.entity.Utilisateur;
@@ -232,5 +235,55 @@ public class NoteService {
     public Note getNoteById(Long id) {
         return noteRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Note", "id", id));
+    }
+
+    // ======================== Récapitulatifs ========================
+
+    public RecapitulatifModuleDTO getRecapitulatifModule(Long moduleId, Long promotionId) {
+        ModuleFormation module = moduleFormationRepository.findById(moduleId)
+                .orElseThrow(() -> new ResourceNotFoundException("Module", "id", moduleId));
+
+        List<Evaluation> evaluations = evaluationRepository
+                .findByModuleFormationIdAndPromotionId(moduleId, promotionId);
+
+        double sommeCoeffMoyenne = 0;
+        double sommeCoeff = 0;
+
+        List<EvaluationRecapDTO> recaps = new ArrayList<>();
+        for (Evaluation eval : evaluations) {
+            Double moyenne = noteRepository.calculerMoyenneEvaluation(eval.getId());
+            Double noteMin = noteRepository.findNoteMinByEvaluation(eval.getId());
+            Double noteMax = noteRepository.findNoteMaxByEvaluation(eval.getId());
+            long nombreNotes = noteRepository.countByEvaluationIdAndValeurIsNotNull(eval.getId());
+            long nombreAbsents = noteRepository.countByEvaluationIdAndAbsentTrue(eval.getId());
+
+            recaps.add(EvaluationRecapDTO.builder()
+                    .evaluationId(eval.getId())
+                    .evaluationNom(eval.getNom())
+                    .type(eval.getType().name())
+                    .coefficient(eval.getCoefficient())
+                    .noteMaximale(eval.getNoteMaximale())
+                    .moyenne(moyenne)
+                    .noteMin(noteMin)
+                    .noteMax(noteMax)
+                    .nombreNotes(nombreNotes)
+                    .nombreAbsents(nombreAbsents)
+                    .build());
+
+            if (moyenne != null) {
+                sommeCoeffMoyenne += moyenne * eval.getCoefficient();
+                sommeCoeff += eval.getCoefficient();
+            }
+        }
+
+        Double moyenneClasse = sommeCoeff > 0 ? sommeCoeffMoyenne / sommeCoeff : null;
+
+        return RecapitulatifModuleDTO.builder()
+                .moduleId(module.getId())
+                .moduleNom(module.getNom())
+                .moduleCode(module.getCode())
+                .evaluations(recaps)
+                .moyenneClasse(moyenneClasse)
+                .build();
     }
 }
