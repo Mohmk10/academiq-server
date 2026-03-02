@@ -2,10 +2,13 @@ package com.academiq.service;
 
 import com.academiq.dto.calcul.BulletinEtudiantDTO;
 import com.academiq.dto.stats.DistributionNotesDTO;
+import com.academiq.dto.stats.ComparaisonPromotionsDTO;
 import com.academiq.dto.stats.EvolutionModuleDTO;
 import com.academiq.dto.stats.EvolutionPerformanceDTO;
 import com.academiq.dto.stats.PeriodeModuleDTO;
 import com.academiq.dto.stats.PeriodePerformanceDTO;
+import com.academiq.dto.stats.PromotionStatsDTO;
+import com.academiq.entity.Niveau;
 import com.academiq.dto.stats.TauxReussiteDTO;
 import com.academiq.dto.stats.TrancheDTO;
 import com.academiq.entity.Etudiant;
@@ -38,8 +41,10 @@ import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 @Service
@@ -190,6 +195,80 @@ public class StatsService {
         }
 
         return construireDistribution("Évaluation", valeurs);
+    }
+
+    public ComparaisonPromotionsDTO comparerPromotions(List<Long> promotionIds) {
+        List<PromotionStatsDTO> stats = new ArrayList<>();
+
+        for (Long promotionId : promotionIds) {
+            stats.add(calculerStatsPromotion(promotionId));
+        }
+
+        return ComparaisonPromotionsDTO.builder()
+                .promotions(stats)
+                .build();
+    }
+
+    PromotionStatsDTO calculerStatsPromotion(Long promotionId) {
+        Promotion promotion = promotionRepository.findById(promotionId)
+                .orElseThrow(() -> new ResourceNotFoundException("Promotion", "id", promotionId));
+        Niveau niveau = promotion.getNiveau();
+
+        List<Inscription> inscriptions = inscriptionRepository
+                .findByPromotionIdAndStatut(promotionId, StatutInscription.ACTIVE);
+
+        int nbAdmis = 0, nbAjournes = 0, nbRattrapage = 0;
+        List<Double> moyennes = new ArrayList<>();
+        Map<String, Integer> mentions = new LinkedHashMap<>();
+        mentions.put("PASSABLE", 0);
+        mentions.put("ASSEZ_BIEN", 0);
+        mentions.put("BIEN", 0);
+        mentions.put("TRES_BIEN", 0);
+        mentions.put("EXCELLENT", 0);
+
+        for (Inscription inscription : inscriptions) {
+            try {
+                BulletinEtudiantDTO bulletin = bulletinService.genererBulletin(
+                        inscription.getEtudiant().getId(), promotionId);
+
+                if (bulletin.getMoyenneAnnuelle() != null) {
+                    moyennes.add(bulletin.getMoyenneAnnuelle());
+                }
+
+                if (DecisionJury.ADMIS.name().equals(bulletin.getDecision())
+                        || DecisionJury.ADMIS_COMPENSATION.name().equals(bulletin.getDecision())) {
+                    nbAdmis++;
+                    if (bulletin.getMention() != null) {
+                        mentions.merge(bulletin.getMention(), 1, Integer::sum);
+                    }
+                } else if (DecisionJury.AJOURNE.name().equals(bulletin.getDecision())) {
+                    nbAjournes++;
+                } else if (DecisionJury.RATTRAPAGE.name().equals(bulletin.getDecision())) {
+                    nbRattrapage++;
+                }
+            } catch (Exception e) {
+                log.warn("Erreur stats promotion {} étudiant {}",
+                        promotionId, inscription.getEtudiant().getId(), e);
+            }
+        }
+
+        int total = inscriptions.size();
+        double taux = total > 0 ? arrondir(nbAdmis * 100.0 / total) : 0;
+
+        return PromotionStatsDTO.builder()
+                .promotionId(promotionId)
+                .promotionNom(promotion.getNom())
+                .anneeUniversitaire(promotion.getAnneeUniversitaire())
+                .filiereNom(niveau.getFiliere().getNom())
+                .niveauNom(niveau.getNiveau().name())
+                .nombreInscrits(total)
+                .moyenneGenerale(calculerMoyenneListe(moyennes))
+                .tauxReussite(taux)
+                .mentions(mentions)
+                .nombreAdmis(nbAdmis)
+                .nombreAjournes(nbAjournes)
+                .nombreRattrapage(nbRattrapage)
+                .build();
     }
 
     public EvolutionPerformanceDTO calculerEvolutionEtudiant(Long etudiantId) {
