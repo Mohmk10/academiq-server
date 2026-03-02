@@ -1,5 +1,9 @@
 package com.academiq.service.pdf;
 
+import com.academiq.dto.calcul.BulletinEtudiantDTO;
+import com.academiq.dto.calcul.BulletinModuleDTO;
+import com.academiq.dto.calcul.BulletinSemestreDTO;
+import com.academiq.dto.calcul.BulletinUeDTO;
 import com.academiq.repository.EtudiantRepository;
 import com.academiq.repository.InscriptionRepository;
 import com.academiq.repository.NiveauRepository;
@@ -11,10 +15,13 @@ import com.lowagie.text.DocumentException;
 import com.lowagie.text.Element;
 import com.lowagie.text.Font;
 import com.lowagie.text.FontFactory;
+import com.lowagie.text.PageSize;
 import com.lowagie.text.Paragraph;
 import com.lowagie.text.Phrase;
 import com.lowagie.text.pdf.ColumnText;
 import com.lowagie.text.pdf.PdfContentByte;
+import com.lowagie.text.pdf.PdfPCell;
+import com.lowagie.text.pdf.PdfPTable;
 import com.lowagie.text.pdf.PdfPageEventHelper;
 import com.lowagie.text.pdf.PdfTemplate;
 import com.lowagie.text.pdf.PdfWriter;
@@ -24,6 +31,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.awt.Color;
+import java.io.ByteArrayOutputStream;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.Locale;
@@ -43,6 +51,237 @@ public class PdfService {
 
     private static final DateTimeFormatter DATE_FORMATTER =
             DateTimeFormatter.ofPattern("dd MMMM yyyy", Locale.FRENCH);
+
+    public byte[] genererReleve(Long etudiantId, Long promotionId) {
+        BulletinEtudiantDTO bulletin = bulletinService.genererBulletin(etudiantId, promotionId);
+
+        try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
+            Document document = new Document(PageSize.A4, 40, 40, 50, 50);
+            PdfWriter writer = PdfWriter.getInstance(document, baos);
+            ajouterPiedDePage(writer);
+            document.open();
+
+            ajouterEnTete(document, "RELEVÉ DE NOTES");
+
+            ajouterBlocInfosEtudiant(document, bulletin);
+
+            for (BulletinSemestreDTO semestre : bulletin.getSemestres()) {
+                ajouterSemestre(document, semestre, bulletin);
+            }
+
+            ajouterRecapitulatifFinal(document, bulletin);
+            ajouterZoneSignature(document);
+
+            document.close();
+            log.info("Relevé de notes généré pour l'étudiant {}", etudiantId);
+            return baos.toByteArray();
+        } catch (Exception e) {
+            log.error("Erreur lors de la génération du relevé de notes", e);
+            throw new RuntimeException("Erreur lors de la génération du PDF", e);
+        }
+    }
+
+    private void ajouterBlocInfosEtudiant(Document document, BulletinEtudiantDTO bulletin)
+            throws DocumentException {
+        PdfPTable table = new PdfPTable(2);
+        table.setWidthPercentage(100);
+        table.setWidths(new float[]{1, 1});
+
+        ajouterInfoLigne(table, "Nom", bulletin.getEtudiantNom());
+        ajouterInfoLigne(table, "Prénom", bulletin.getEtudiantPrenom());
+        ajouterInfoLigne(table, "Matricule", bulletin.getEtudiantMatricule());
+        ajouterInfoLigne(table, "Filière", bulletin.getFiliereNom());
+        ajouterInfoLigne(table, "Niveau", bulletin.getNiveauNom());
+        ajouterInfoLigne(table, "Promotion", bulletin.getPromotionNom());
+        ajouterInfoLigne(table, "Année universitaire", bulletin.getAnneeUniversitaire());
+
+        document.add(table);
+        PdfStyleHelper.addEmptyLine(document, 1);
+    }
+
+    private void ajouterInfoLigne(PdfPTable table, String label, String valeur) {
+        PdfPCell cellLabel = new PdfPCell(new Phrase(label + " :", PdfStyleHelper.getBoldFont()));
+        cellLabel.setBorder(0);
+        cellLabel.setPadding(3);
+        table.addCell(cellLabel);
+
+        PdfPCell cellValeur = new PdfPCell(new Phrase(
+                valeur != null ? valeur : "N/A", PdfStyleHelper.getNormalFont()));
+        cellValeur.setBorder(0);
+        cellValeur.setPadding(3);
+        table.addCell(cellValeur);
+    }
+
+    private void ajouterSemestre(Document document, BulletinSemestreDTO semestre,
+                                  BulletinEtudiantDTO bulletin) throws DocumentException {
+        Paragraph titreSemestre = new Paragraph(semestre.getSemestreNom(),
+                PdfStyleHelper.getSubtitleFont());
+        titreSemestre.setSpacingBefore(10);
+        titreSemestre.setSpacingAfter(5);
+        document.add(titreSemestre);
+
+        for (BulletinUeDTO ue : semestre.getUes()) {
+            Paragraph titreUe = new Paragraph(
+                    ue.getUeCode() + " — " + ue.getUeNom() + " (" + ue.getCredits() + " ECTS)",
+                    PdfStyleHelper.getBoldFont());
+            titreUe.setSpacingBefore(5);
+            document.add(titreUe);
+
+            PdfPTable tableModules = PdfStyleHelper.createStyledTable(7,
+                    new float[]{1.2f, 3f, 1.2f, 1.2f, 1.2f, 1f, 1f});
+            tableModules.addCell(PdfStyleHelper.createHeaderCell("Code"));
+            tableModules.addCell(PdfStyleHelper.createHeaderCell("Module"));
+            tableModules.addCell(PdfStyleHelper.createHeaderCell("Moy. CC"));
+            tableModules.addCell(PdfStyleHelper.createHeaderCell("Note Exam"));
+            tableModules.addCell(PdfStyleHelper.createHeaderCell("Moyenne"));
+            tableModules.addCell(PdfStyleHelper.createHeaderCell("Coeff"));
+            tableModules.addCell(PdfStyleHelper.createHeaderCell("Crédits"));
+
+            int row = 0;
+            for (BulletinModuleDTO module : ue.getModules()) {
+                Color bgColor = (row % 2 == 1) ? PdfStyleHelper.getCouleurSecondaire() : Color.WHITE;
+
+                tableModules.addCell(createColoredCell(module.getModuleCode(), bgColor, false));
+                tableModules.addCell(createColoredCell(module.getModuleNom(), bgColor, false));
+                tableModules.addCell(createColoredCell(formatNote(module.getMoyenneCC()), bgColor, true));
+                tableModules.addCell(createColoredCell(formatNote(module.getNoteExamen()), bgColor, true));
+                tableModules.addCell(createColoredCell(formatNote(module.getMoyenneModule()), bgColor, true));
+                tableModules.addCell(createColoredCell(String.valueOf(module.getCoefficient()), bgColor, true));
+                tableModules.addCell(createColoredCell(String.valueOf(module.getCredits()), bgColor, true));
+                row++;
+            }
+
+            document.add(tableModules);
+
+            PdfPTable resumeUe = new PdfPTable(3);
+            resumeUe.setWidthPercentage(100);
+            resumeUe.setWidths(new float[]{2, 1, 1});
+
+            PdfPCell cellMoyUe = new PdfPCell(new Phrase(
+                    "Moyenne UE : " + formatNote(ue.getMoyenneUE()), PdfStyleHelper.getBoldFont()));
+            cellMoyUe.setBorder(0);
+            cellMoyUe.setPadding(4);
+            resumeUe.addCell(cellMoyUe);
+
+            PdfPCell cellValidee = new PdfPCell(new Phrase(
+                    "Validée : " + (ue.isValidee() ? "Oui" : "Non"), PdfStyleHelper.getBoldFont()));
+            cellValidee.setBorder(0);
+            cellValidee.setPadding(4);
+            cellValidee.setHorizontalAlignment(Element.ALIGN_CENTER);
+            resumeUe.addCell(cellValidee);
+
+            PdfPCell cellCreditsUe = new PdfPCell(new Phrase(
+                    "Crédits acquis : " + (ue.isValidee() ? ue.getCredits() : 0),
+                    PdfStyleHelper.getBoldFont()));
+            cellCreditsUe.setBorder(0);
+            cellCreditsUe.setPadding(4);
+            cellCreditsUe.setHorizontalAlignment(Element.ALIGN_RIGHT);
+            resumeUe.addCell(cellCreditsUe);
+
+            document.add(resumeUe);
+        }
+
+        PdfPTable resumeSemestre = new PdfPTable(2);
+        resumeSemestre.setWidthPercentage(100);
+        resumeSemestre.setWidths(new float[]{1, 1});
+        resumeSemestre.setSpacingBefore(5);
+
+        PdfPCell cellMoySem = new PdfPCell(new Phrase(
+                "Moyenne semestre : " + formatNote(semestre.getMoyenneSemestre()),
+                PdfStyleHelper.getBoldFont()));
+        cellMoySem.setBorder(0);
+        cellMoySem.setPadding(5);
+        cellMoySem.setBackgroundColor(PdfStyleHelper.getCouleurSecondaire());
+        resumeSemestre.addCell(cellMoySem);
+
+        PdfPCell cellCreditsSem = new PdfPCell(new Phrase(
+                "Crédits validés : " + semestre.getCreditsValidesSemestre(),
+                PdfStyleHelper.getBoldFont()));
+        cellCreditsSem.setBorder(0);
+        cellCreditsSem.setPadding(5);
+        cellCreditsSem.setHorizontalAlignment(Element.ALIGN_RIGHT);
+        cellCreditsSem.setBackgroundColor(PdfStyleHelper.getCouleurSecondaire());
+        resumeSemestre.addCell(cellCreditsSem);
+
+        document.add(resumeSemestre);
+    }
+
+    private PdfPCell createColoredCell(String text, Color bgColor, boolean centered) {
+        Font font = PdfStyleHelper.getNormalFont();
+        PdfPCell cell = new PdfPCell(new Phrase(text, font));
+        cell.setPadding(5);
+        cell.setBackgroundColor(bgColor);
+        cell.setVerticalAlignment(Element.ALIGN_MIDDLE);
+        if (centered) {
+            cell.setHorizontalAlignment(Element.ALIGN_CENTER);
+        }
+        return cell;
+    }
+
+    private void ajouterRecapitulatifFinal(Document document, BulletinEtudiantDTO bulletin)
+            throws DocumentException {
+        PdfStyleHelper.addEmptyLine(document, 1);
+
+        Paragraph titreRecap = new Paragraph("RÉCAPITULATIF", PdfStyleHelper.getSubtitleFont());
+        titreRecap.setSpacingAfter(10);
+        document.add(titreRecap);
+
+        Font grandBold = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 14, Font.BOLD, Color.BLACK);
+
+        PdfPTable tableRecap = new PdfPTable(2);
+        tableRecap.setWidthPercentage(80);
+        tableRecap.setHorizontalAlignment(Element.ALIGN_CENTER);
+        tableRecap.setWidths(new float[]{1, 1});
+
+        ajouterLigneRecap(tableRecap, "Moyenne annuelle",
+                formatNote(bulletin.getMoyenneAnnuelle()) + " / 20", grandBold);
+        ajouterLigneRecap(tableRecap, "Crédits validés",
+                bulletin.getCreditsValides() + " / " + bulletin.getCreditsTotaux(),
+                PdfStyleHelper.getBoldFont());
+        ajouterLigneRecap(tableRecap, "Décision du jury",
+                bulletin.getDecision() != null ? bulletin.getDecision() : "EN_ATTENTE",
+                PdfStyleHelper.getBoldFont());
+        if (bulletin.getMention() != null) {
+            ajouterLigneRecap(tableRecap, "Mention", bulletin.getMention(),
+                    PdfStyleHelper.getBoldFont());
+        }
+
+        document.add(tableRecap);
+    }
+
+    private void ajouterLigneRecap(PdfPTable table, String label, String valeur, Font font) {
+        PdfPCell cellLabel = new PdfPCell(new Phrase(label, PdfStyleHelper.getBoldFont()));
+        cellLabel.setPadding(8);
+        cellLabel.setBackgroundColor(PdfStyleHelper.getCouleurSecondaire());
+        table.addCell(cellLabel);
+
+        PdfPCell cellValeur = new PdfPCell(new Phrase(valeur, font));
+        cellValeur.setPadding(8);
+        cellValeur.setHorizontalAlignment(Element.ALIGN_CENTER);
+        table.addCell(cellValeur);
+    }
+
+    private void ajouterZoneSignature(Document document) throws DocumentException {
+        PdfStyleHelper.addEmptyLine(document, 2);
+
+        Paragraph lieu = new Paragraph(
+                "Fait à Dakar, le " + LocalDate.now().format(DATE_FORMATTER),
+                PdfStyleHelper.getNormalFont());
+        lieu.setAlignment(Element.ALIGN_RIGHT);
+        document.add(lieu);
+
+        PdfStyleHelper.addEmptyLine(document, 3);
+
+        Paragraph signataire = new Paragraph("Le Directeur des Études",
+                PdfStyleHelper.getBoldFont());
+        signataire.setAlignment(Element.ALIGN_RIGHT);
+        document.add(signataire);
+    }
+
+    private String formatNote(Double note) {
+        if (note == null) return "—";
+        return String.format("%.2f", note);
+    }
 
     void ajouterEnTete(Document document, String titre) throws DocumentException {
         Paragraph logo = new Paragraph("AcademiQ", PdfStyleHelper.getTitleFont());
