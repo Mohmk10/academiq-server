@@ -16,12 +16,16 @@ import com.academiq.mapper.NoteMapper;
 import com.academiq.security.IsAdmin;
 import com.academiq.security.IsEnseignantOrAdmin;
 import com.academiq.service.HistoriqueNoteService;
+import com.academiq.service.ImportNotesService;
 import com.academiq.service.NoteService;
 import com.academiq.service.SaisieEnMasseService;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -33,8 +37,12 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.util.List;
 
 @RestController
@@ -47,6 +55,7 @@ public class NoteController {
     private final NoteMapper noteMapper;
     private final SaisieEnMasseService saisieEnMasseService;
     private final HistoriqueNoteService historiqueNoteService;
+    private final ImportNotesService importNotesService;
 
     // ======================== Évaluations ========================
 
@@ -206,5 +215,33 @@ public class NoteController {
         SaisieEnMasseResult result = saisieEnMasseService.saisirNotesClasse(
                 evaluationId, notes, utilisateur.getId());
         return ResponseEntity.ok(ApiResponse.success("Saisie en masse terminée", result));
+    }
+
+    // ======================== Import/Export Excel ========================
+
+    @PostMapping("/evaluations/{evaluationId}/import-excel")
+    @IsEnseignantOrAdmin
+    public ResponseEntity<ApiResponse<SaisieEnMasseResult>> importerNotesExcel(
+            @PathVariable Long evaluationId,
+            @RequestParam("fichier") MultipartFile fichier,
+            @AuthenticationPrincipal Utilisateur utilisateur) {
+        SaisieEnMasseResult result = importNotesService.importerNotesExcel(
+                evaluationId, fichier, utilisateur.getId());
+        return ResponseEntity.ok(ApiResponse.success("Import Excel terminé", result));
+    }
+
+    @GetMapping("/evaluations/{evaluationId}/template-excel")
+    @IsEnseignantOrAdmin
+    public ResponseEntity<byte[]> telechargerTemplateExcel(@PathVariable Long evaluationId) throws IOException {
+        Workbook workbook = importNotesService.genererTemplateExcel(evaluationId);
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        workbook.write(out);
+        workbook.close();
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
+        headers.setContentDispositionFormData("attachment", "template_notes_" + evaluationId + ".xlsx");
+
+        return new ResponseEntity<>(out.toByteArray(), headers, HttpStatus.OK);
     }
 }
