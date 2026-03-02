@@ -1,13 +1,20 @@
 package com.academiq.service;
 
 import com.academiq.dto.note.EvaluationRecapDTO;
+import com.academiq.dto.note.ModuleNotesDTO;
+import com.academiq.dto.note.NoteDetailDTO;
 import com.academiq.dto.note.NoteSaisieDTO;
+import com.academiq.dto.note.RecapitulatifEtudiantDTO;
 import com.academiq.dto.note.RecapitulatifModuleDTO;
 import com.academiq.entity.Evaluation;
 import com.academiq.entity.Etudiant;
+import com.academiq.entity.Inscription;
 import com.academiq.entity.ModuleFormation;
 import com.academiq.entity.Note;
+import com.academiq.entity.Promotion;
 import com.academiq.entity.StatutEvaluation;
+import com.academiq.entity.StatutInscription;
+import com.academiq.entity.TypeEvaluation;
 import com.academiq.entity.Utilisateur;
 import com.academiq.exception.BadRequestException;
 import com.academiq.exception.DuplicateResourceException;
@@ -27,7 +34,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -285,5 +296,106 @@ public class NoteService {
                 .evaluations(recaps)
                 .moyenneClasse(moyenneClasse)
                 .build();
+    }
+
+    public RecapitulatifEtudiantDTO getRecapitulatifEtudiant(Long etudiantId, Long promotionId) {
+        Etudiant etudiant = etudiantRepository.findById(etudiantId)
+                .orElseThrow(() -> new ResourceNotFoundException("Étudiant", "id", etudiantId));
+
+        Promotion promotion = promotionRepository.findById(promotionId)
+                .orElseThrow(() -> new ResourceNotFoundException("Promotion", "id", promotionId));
+
+        Inscription inscription = inscriptionRepository.findByEtudiantIdAndPromotionId(etudiantId, promotionId)
+                .orElseThrow(() -> new BadRequestException("L'étudiant n'est pas inscrit à cette promotion"));
+
+        List<Note> notes = noteRepository.findByEtudiantIdAndPromotionId(etudiantId, promotionId);
+
+        Set<TypeEvaluation> typesCC = EnumSet.of(
+                TypeEvaluation.CC, TypeEvaluation.TP, TypeEvaluation.PROJET);
+
+        Map<Long, List<Note>> notesByModule = notes.stream()
+                .collect(Collectors.groupingBy(n -> n.getEvaluation().getModuleFormation().getId()));
+
+        List<ModuleNotesDTO> modulesDTO = new ArrayList<>();
+
+        for (Map.Entry<Long, List<Note>> entry : notesByModule.entrySet()) {
+            List<Note> notesModule = entry.getValue();
+            ModuleFormation module = notesModule.get(0).getEvaluation().getModuleFormation();
+
+            List<NoteDetailDTO> noteDetails = notesModule.stream()
+                    .map(n -> NoteDetailDTO.builder()
+                            .noteId(n.getId())
+                            .evaluationNom(n.getEvaluation().getNom())
+                            .type(n.getEvaluation().getType().name())
+                            .valeur(n.getValeur())
+                            .absent(n.isAbsent())
+                            .noteMaximale(n.getEvaluation().getNoteMaximale())
+                            .coefficient(n.getEvaluation().getCoefficient())
+                            .build())
+                    .toList();
+
+            Double moyenneModule = calculerMoyenneModule(notesModule, module, typesCC);
+
+            modulesDTO.add(ModuleNotesDTO.builder()
+                    .moduleId(module.getId())
+                    .moduleNom(module.getNom())
+                    .moduleCode(module.getCode())
+                    .ueNom(module.getUniteEnseignement().getNom())
+                    .coefficient(module.getCoefficient())
+                    .credits(module.getCredits())
+                    .notes(noteDetails)
+                    .moyenneModule(moyenneModule)
+                    .build());
+        }
+
+        var utilisateur = etudiant.getUtilisateur();
+        return RecapitulatifEtudiantDTO.builder()
+                .etudiantId(etudiant.getId())
+                .etudiantNom(utilisateur.getPrenom() + " " + utilisateur.getNom())
+                .etudiantMatricule(etudiant.getMatricule())
+                .promotionNom(promotion.getNom())
+                .modules(modulesDTO)
+                .build();
+    }
+
+    private Double calculerMoyenneModule(List<Note> notes, ModuleFormation module,
+                                         Set<TypeEvaluation> typesCC) {
+        List<Note> notesCC = notes.stream()
+                .filter(n -> typesCC.contains(n.getEvaluation().getType()))
+                .filter(n -> !n.isAbsent() && n.getValeur() != null)
+                .toList();
+
+        List<Note> notesExamen = notes.stream()
+                .filter(n -> n.getEvaluation().getType() == TypeEvaluation.EXAMEN
+                        || n.getEvaluation().getType() == TypeEvaluation.PARTIEL)
+                .filter(n -> !n.isAbsent() && n.getValeur() != null)
+                .toList();
+
+        Double moyenneCC = null;
+        if (!notesCC.isEmpty()) {
+            double sommeCoeffValeur = 0;
+            double sommeCoeff = 0;
+            for (Note n : notesCC) {
+                double noteRamenee = (n.getValeur() / n.getEvaluation().getNoteMaximale()) * 20;
+                sommeCoeffValeur += noteRamenee * n.getEvaluation().getCoefficient();
+                sommeCoeff += n.getEvaluation().getCoefficient();
+            }
+            moyenneCC = sommeCoeff > 0 ? sommeCoeffValeur / sommeCoeff : null;
+        }
+
+        Double noteExamen = null;
+        if (!notesExamen.isEmpty()) {
+            Note derniere = notesExamen.get(notesExamen.size() - 1);
+            noteExamen = (derniere.getValeur() / derniere.getEvaluation().getNoteMaximale()) * 20;
+        }
+
+        if (moyenneCC != null && noteExamen != null) {
+            return moyenneCC * module.getPonderationCC() + noteExamen * module.getPonderationExamen();
+        } else if (moyenneCC != null) {
+            return moyenneCC;
+        } else if (noteExamen != null) {
+            return noteExamen;
+        }
+        return null;
     }
 }

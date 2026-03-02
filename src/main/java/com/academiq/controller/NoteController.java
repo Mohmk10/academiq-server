@@ -6,6 +6,7 @@ import com.academiq.dto.note.EvaluationResponse;
 import com.academiq.dto.note.NotePrepopuleeDTO;
 import com.academiq.dto.note.HistoriqueNoteResponse;
 import com.academiq.dto.note.NoteResponse;
+import com.academiq.dto.note.RecapitulatifEtudiantDTO;
 import com.academiq.dto.note.RecapitulatifModuleDTO;
 import com.academiq.dto.note.NoteSaisieEnMasseRequest;
 import com.academiq.dto.note.NoteSaisieRequest;
@@ -243,6 +244,14 @@ public class NoteController {
             @PathVariable Long moduleId, @PathVariable Long promotionId) {
         return ResponseEntity.ok(ApiResponse.success(
                 noteService.getRecapitulatifModule(moduleId, promotionId)));
+    }
+
+    @GetMapping("/etudiant/{etudiantId}/promotion/{promotionId}/recapitulatif")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<RecapitulatifEtudiantDTO>> getRecapitulatifEtudiant(
+            @PathVariable Long etudiantId, @PathVariable Long promotionId) {
+        return ResponseEntity.ok(ApiResponse.success(
+                noteService.getRecapitulatifEtudiant(etudiantId, promotionId)));
     }
 
     // ======================== Import/Export Excel ========================
