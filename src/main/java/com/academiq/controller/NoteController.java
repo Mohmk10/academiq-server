@@ -14,6 +14,7 @@ import com.academiq.entity.Note;
 import com.academiq.entity.Utilisateur;
 import com.academiq.mapper.NoteMapper;
 import com.academiq.security.IsAdmin;
+import com.academiq.security.IsAdminOrResponsable;
 import com.academiq.security.IsEnseignantOrAdmin;
 import com.academiq.service.HistoriqueNoteService;
 import com.academiq.service.ImportNotesService;
@@ -170,6 +171,22 @@ public class NoteController {
     public ResponseEntity<ApiResponse<NoteResponse>> getNote(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success(
                 noteMapper.toNoteResponse(noteService.getNoteById(id))));
+    }
+
+    // ======================== Verrouillage ========================
+
+    @PatchMapping("/evaluations/{id}/verrouiller")
+    @IsAdminOrResponsable
+    public ResponseEntity<ApiResponse<Void>> verrouillerEvaluation(@PathVariable Long id) {
+        noteService.verrouillerEvaluation(id);
+        return ResponseEntity.ok(ApiResponse.success("Évaluation verrouillée avec succès"));
+    }
+
+    @PatchMapping("/evaluations/{id}/deverrouiller")
+    @IsAdmin
+    public ResponseEntity<ApiResponse<Void>> deverrouillerEvaluation(@PathVariable Long id) {
+        noteService.deverrouillerEvaluation(id);
+        return ResponseEntity.ok(ApiResponse.success("Évaluation déverrouillée avec succès"));
     }
 
     // ======================== Historique ========================

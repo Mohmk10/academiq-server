@@ -191,6 +191,30 @@ public class NoteService {
         log.info("Saisie terminée pour évaluation {}", evaluationId);
     }
 
+    // ======================== Verrouillage ========================
+
+    @Transactional
+    public void verrouillerEvaluation(Long evaluationId) {
+        Evaluation evaluation = getEvaluationById(evaluationId);
+        if (evaluation.getStatut() != StatutEvaluation.TERMINEE) {
+            throw new BadRequestException("La saisie doit être terminée avant le verrouillage");
+        }
+        evaluation.setStatut(StatutEvaluation.VERROUILLEE);
+        evaluationRepository.save(evaluation);
+        log.info("Évaluation {} verrouillée", evaluationId);
+    }
+
+    @Transactional
+    public void deverrouillerEvaluation(Long evaluationId) {
+        Evaluation evaluation = getEvaluationById(evaluationId);
+        if (evaluation.getStatut() != StatutEvaluation.VERROUILLEE) {
+            throw new BadRequestException("L'évaluation n'est pas verrouillée");
+        }
+        evaluation.setStatut(StatutEvaluation.TERMINEE);
+        evaluationRepository.save(evaluation);
+        log.info("Évaluation {} déverrouillée", evaluationId);
+    }
+
     // ======================== Consultation ========================
 
     public List<Note> getNotesByEvaluation(Long evaluationId) {
