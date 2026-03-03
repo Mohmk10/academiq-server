@@ -3,6 +3,11 @@ package com.academiq.service;
 import com.academiq.dto.calcul.BulletinEtudiantDTO;
 import com.academiq.dto.stats.DistributionNotesDTO;
 import com.academiq.dto.stats.ComparaisonPromotionsDTO;
+import com.academiq.dto.stats.DashboardAdminDTO;
+import com.academiq.entity.Filiere;
+import com.academiq.entity.NiveauAlerte;
+import com.academiq.entity.Role;
+import com.academiq.entity.StatutAlerte;
 import com.academiq.dto.stats.EvolutionModuleDTO;
 import com.academiq.dto.stats.EvolutionPerformanceDTO;
 import com.academiq.dto.stats.PeriodeModuleDTO;
@@ -195,6 +200,50 @@ public class StatsService {
         }
 
         return construireDistribution("Évaluation", valeurs);
+    }
+
+    public DashboardAdminDTO getDashboardAdmin() {
+        long totalUtilisateurs = utilisateurRepository.countByActifTrue();
+        long totalEtudiants = utilisateurRepository.countByRole(Role.ETUDIANT);
+        long totalEnseignants = utilisateurRepository.countByRole(Role.ENSEIGNANT);
+
+        List<Filiere> filieres = filiereRepository.findByActifTrue();
+        long totalFilieres = filieres.size();
+
+        List<Promotion> promotionsActives = promotionRepository.findByActifTrue();
+        long totalPromotionsActives = promotionsActives.size();
+
+        long alertesActives = alerteRepository.countByStatut(StatutAlerte.ACTIVE);
+        long alertesCritiques = alerteRepository.countByNiveauAndStatut(
+                NiveauAlerte.CRITIQUE, StatutAlerte.ACTIVE);
+
+        List<PromotionStatsDTO> promotionsStats = new ArrayList<>();
+        for (Promotion promo : promotionsActives) {
+            try {
+                promotionsStats.add(calculerStatsPromotion(promo.getId()));
+            } catch (Exception e) {
+                log.warn("Erreur stats promotion {}", promo.getId(), e);
+            }
+        }
+
+        Map<String, Long> inscriptionsParFiliere = new LinkedHashMap<>();
+        for (Promotion promo : promotionsActives) {
+            String filiereNom = promo.getNiveau().getFiliere().getNom();
+            long nbInscrits = inscriptionRepository.countByPromotionId(promo.getId());
+            inscriptionsParFiliere.merge(filiereNom, nbInscrits, Long::sum);
+        }
+
+        return DashboardAdminDTO.builder()
+                .totalUtilisateurs(totalUtilisateurs)
+                .totalEtudiants(totalEtudiants)
+                .totalEnseignants(totalEnseignants)
+                .totalFilieres(totalFilieres)
+                .totalPromotionsActives(totalPromotionsActives)
+                .alertesActives(alertesActives)
+                .alertesCritiques(alertesCritiques)
+                .promotionsStats(promotionsStats)
+                .inscriptionsParFiliere(inscriptionsParFiliere)
+                .build();
     }
 
     public ComparaisonPromotionsDTO comparerPromotions(List<Long> promotionIds) {
