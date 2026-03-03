@@ -4,6 +4,10 @@ import com.academiq.dto.calcul.BulletinEtudiantDTO;
 import com.academiq.dto.stats.DistributionNotesDTO;
 import com.academiq.dto.stats.ComparaisonPromotionsDTO;
 import com.academiq.dto.stats.DashboardAdminDTO;
+import com.academiq.dto.stats.DashboardEnseignantDTO;
+import com.academiq.dto.stats.ModuleEnseignantStatsDTO;
+import com.academiq.entity.Alerte;
+import com.academiq.entity.Enseignant;
 import com.academiq.entity.Filiere;
 import com.academiq.entity.NiveauAlerte;
 import com.academiq.entity.Role;
@@ -200,6 +204,85 @@ public class StatsService {
         }
 
         return construireDistribution("Évaluation", valeurs);
+    }
+
+    public DashboardEnseignantDTO getDashboardEnseignant(Long enseignantId) {
+        Enseignant enseignant = enseignantRepository.findById(enseignantId)
+                .orElseThrow(() -> new ResourceNotFoundException("Enseignant", "id", enseignantId));
+
+        List<ModuleFormation> modules = moduleFormationRepository.findByEnseignantId(enseignantId);
+
+        List<ModuleEnseignantStatsDTO> modulesStats = new ArrayList<>();
+        int totalEtudiants = 0;
+        long totalAlertes = 0;
+
+        for (ModuleFormation module : modules) {
+            List<Evaluation> evaluations = evaluationRepository.findByModuleFormationId(module.getId());
+            Set<Long> promotionIds = new LinkedHashSet<>();
+            for (Evaluation eval : evaluations) {
+                promotionIds.add(eval.getPromotion().getId());
+            }
+
+            for (Long promotionId : promotionIds) {
+                Promotion promotion = promotionRepository.findById(promotionId).orElse(null);
+                if (promotion == null || !promotion.isActif()) continue;
+
+                List<Inscription> inscriptions = inscriptionRepository
+                        .findByPromotionIdAndStatut(promotionId, StatutInscription.ACTIVE);
+                int nbInscrits = inscriptions.size();
+                totalEtudiants += nbInscrits;
+
+                int nbNotesSaisies = 0;
+                List<Evaluation> evalsModule = evaluationRepository
+                        .findByModuleFormationIdAndPromotionId(module.getId(), promotionId);
+                for (Evaluation eval : evalsModule) {
+                    nbNotesSaisies += (int) noteRepository.countByEvaluationIdAndValeurIsNotNull(eval.getId());
+                }
+
+                List<Double> moyennes = new ArrayList<>();
+                int reussis = 0;
+                for (Inscription inscription : inscriptions) {
+                    Double moyenne = calculService.calculerMoyenneModule(
+                            inscription.getEtudiant().getId(), module.getId(), promotionId);
+                    if (moyenne != null) {
+                        moyennes.add(moyenne);
+                        if (moyenne >= 10) reussis++;
+                    }
+                }
+
+                Double moyenneClasse = calculerMoyenneListe(moyennes);
+                double taux = nbInscrits > 0 ? arrondir(reussis * 100.0 / nbInscrits) : 0;
+
+                List<Alerte> alertesModule = alerteRepository.findByPromotionIdAndStatut(
+                        promotionId, StatutAlerte.ACTIVE);
+                int nbAlertes = (int) alertesModule.stream()
+                        .filter(a -> a.getModuleFormation() != null
+                                && a.getModuleFormation().getId().equals(module.getId()))
+                        .count();
+                totalAlertes += nbAlertes;
+
+                modulesStats.add(ModuleEnseignantStatsDTO.builder()
+                        .moduleId(module.getId())
+                        .moduleNom(module.getNom())
+                        .moduleCode(module.getCode())
+                        .promotionNom(promotion.getNom())
+                        .nombreInscrits(nbInscrits)
+                        .nombreNotesSaisies(nbNotesSaisies)
+                        .moyenneClasse(moyenneClasse)
+                        .tauxReussite(taux)
+                        .nombreAlertes(nbAlertes)
+                        .build());
+            }
+        }
+
+        var utilisateur = enseignant.getUtilisateur();
+        return DashboardEnseignantDTO.builder()
+                .enseignantNom(utilisateur.getPrenom() + " " + utilisateur.getNom())
+                .nombreModules(modules.size())
+                .nombreEtudiantsTotal(totalEtudiants)
+                .modules(modulesStats)
+                .alertesActives(totalAlertes)
+                .build();
     }
 
     public DashboardAdminDTO getDashboardAdmin() {
