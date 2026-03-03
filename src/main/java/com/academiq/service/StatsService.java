@@ -5,7 +5,9 @@ import com.academiq.dto.stats.DistributionNotesDTO;
 import com.academiq.dto.stats.ComparaisonPromotionsDTO;
 import com.academiq.dto.stats.DashboardAdminDTO;
 import com.academiq.dto.stats.DashboardEnseignantDTO;
+import com.academiq.dto.stats.DashboardEtudiantDTO;
 import com.academiq.dto.stats.ModuleEnseignantStatsDTO;
+import com.academiq.dto.stats.NoteRecenteDTO;
 import com.academiq.entity.Alerte;
 import com.academiq.entity.Enseignant;
 import com.academiq.entity.Filiere;
@@ -204,6 +206,114 @@ public class StatsService {
         }
 
         return construireDistribution("Évaluation", valeurs);
+    }
+
+    public DashboardEtudiantDTO getDashboardEtudiant(Long etudiantId) {
+        Etudiant etudiant = etudiantRepository.findById(etudiantId)
+                .orElseThrow(() -> new ResourceNotFoundException("Étudiant", "id", etudiantId));
+
+        List<Inscription> inscriptions = inscriptionRepository.findByEtudiantId(etudiantId);
+        Inscription inscriptionActive = inscriptions.stream()
+                .filter(i -> i.getStatut() == StatutInscription.ACTIVE)
+                .findFirst()
+                .orElse(null);
+
+        if (inscriptionActive == null) {
+            var utilisateur = etudiant.getUtilisateur();
+            return DashboardEtudiantDTO.builder()
+                    .etudiantNom(utilisateur.getPrenom() + " " + utilisateur.getNom())
+                    .etudiantMatricule(etudiant.getMatricule())
+                    .alertes(List.of())
+                    .notesRecentes(List.of())
+                    .moyennesParModule(Map.of())
+                    .build();
+        }
+
+        Long promotionId = inscriptionActive.getPromotion().getId();
+        BulletinEtudiantDTO bulletin = bulletinService.genererBulletin(etudiantId, promotionId);
+
+        List<Inscription> tousInscrits = inscriptionRepository
+                .findByPromotionIdAndStatut(promotionId, StatutInscription.ACTIVE);
+
+        List<Double> toutesLes = new ArrayList<>();
+        for (Inscription insc : tousInscrits) {
+            try {
+                BulletinEtudiantDTO b = bulletinService.genererBulletin(
+                        insc.getEtudiant().getId(), promotionId);
+                if (b.getMoyenneAnnuelle() != null) {
+                    toutesLes.add(b.getMoyenneAnnuelle());
+                }
+            } catch (Exception e) {
+                log.warn("Erreur calcul rang étudiant {}", insc.getEtudiant().getId());
+            }
+        }
+
+        toutesLes.sort(Comparator.reverseOrder());
+        int rang = 1;
+        if (bulletin.getMoyenneAnnuelle() != null) {
+            for (Double m : toutesLes) {
+                if (m > bulletin.getMoyenneAnnuelle()) {
+                    rang++;
+                } else {
+                    break;
+                }
+            }
+        }
+
+        List<Alerte> alertesEtudiant = alerteRepository.findByEtudiantIdAndStatut(
+                etudiantId, StatutAlerte.ACTIVE);
+        List<String> messagesAlertes = alertesEtudiant.stream()
+                .map(Alerte::getMessage)
+                .toList();
+
+        List<Note> toutesNotes = noteRepository.findByEtudiantId(etudiantId);
+        List<NoteRecenteDTO> notesRecentes = toutesNotes.stream()
+                .filter(n -> n.getValeur() != null && !n.isAbsent())
+                .sorted(Comparator.comparing(Note::getDateSaisie,
+                        Comparator.nullsLast(Comparator.reverseOrder())))
+                .limit(5)
+                .map(n -> NoteRecenteDTO.builder()
+                        .evaluationNom(n.getEvaluation().getNom())
+                        .moduleNom(n.getEvaluation().getModuleFormation().getNom())
+                        .type(n.getEvaluation().getType().name())
+                        .valeur(n.getValeur())
+                        .noteMaximale(n.getEvaluation().getNoteMaximale())
+                        .date(n.getEvaluation().getDateEvaluation())
+                        .build())
+                .toList();
+
+        Map<String, Double> moyennesParModule = new LinkedHashMap<>();
+        Set<Long> moduleIds = new LinkedHashSet<>();
+        List<Note> notesPromotion = noteRepository.findByEtudiantIdAndPromotionId(etudiantId, promotionId);
+        for (Note note : notesPromotion) {
+            moduleIds.add(note.getEvaluation().getModuleFormation().getId());
+        }
+        for (Long moduleId : moduleIds) {
+            ModuleFormation module = moduleFormationRepository.findById(moduleId).orElse(null);
+            if (module == null) continue;
+            Double moyenne = calculService.calculerMoyenneModule(etudiantId, moduleId, promotionId);
+            if (moyenne != null) {
+                moyennesParModule.put(module.getNom(), moyenne);
+            }
+        }
+
+        var utilisateur = etudiant.getUtilisateur();
+        return DashboardEtudiantDTO.builder()
+                .etudiantNom(utilisateur.getPrenom() + " " + utilisateur.getNom())
+                .etudiantMatricule(etudiant.getMatricule())
+                .promotionNom(bulletin.getPromotionNom())
+                .filiereNom(bulletin.getFiliereNom())
+                .niveauNom(bulletin.getNiveauNom())
+                .moyenneActuelle(bulletin.getMoyenneAnnuelle())
+                .creditsValides(bulletin.getCreditsValides())
+                .creditsTotaux(bulletin.getCreditsTotaux())
+                .rang(rang)
+                .totalEtudiants(tousInscrits.size())
+                .nombreAlertes(alertesEtudiant.size())
+                .alertes(messagesAlertes)
+                .notesRecentes(notesRecentes)
+                .moyennesParModule(moyennesParModule)
+                .build();
     }
 
     public DashboardEnseignantDTO getDashboardEnseignant(Long enseignantId) {
