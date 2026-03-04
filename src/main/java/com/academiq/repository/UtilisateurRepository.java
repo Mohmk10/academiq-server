@@ -22,6 +22,10 @@ public interface UtilisateurRepository extends JpaRepository<Utilisateur, Long> 
 
     long countByActifTrue();
 
+    long countByRoleAndActifTrue(Role role);
+
+    Page<Utilisateur> findByRoleNot(Role role, Pageable pageable);
+
     @Query("SELECT u FROM Utilisateur u " +
             "WHERE LOWER(u.nom) LIKE LOWER(CONCAT('%', :keyword, '%')) " +
             "OR LOWER(u.prenom) LIKE LOWER(CONCAT('%', :keyword, '%')) " +

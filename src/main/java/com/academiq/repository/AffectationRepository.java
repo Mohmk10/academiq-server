@@ -19,4 +19,6 @@ public interface AffectationRepository extends JpaRepository<Affectation, Long> 
     boolean existsByEnseignantIdAndModuleFormationIdAndPromotionId(Long enseignantId, Long moduleId, Long promotionId);
 
     List<Affectation> findByEnseignantIdAndActifTrue(Long enseignantId);
+
+    boolean existsByEnseignantIdAndModuleFormationIdAndActifTrue(Long enseignantId, Long moduleId);
 }
