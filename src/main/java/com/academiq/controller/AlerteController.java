@@ -19,6 +19,7 @@ import com.academiq.security.IsEnseignantOrAdmin;
 import com.academiq.service.AlerteService;
 import com.academiq.service.DetectionAlerteService;
 import com.academiq.service.RegleAlerteService;
+import com.academiq.service.SecurityService;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -49,6 +50,7 @@ public class AlerteController {
     private final DetectionAlerteService detectionAlerteService;
     private final RegleAlerteService regleAlerteService;
     private final AlerteMapper alerteMapper;
+    private final SecurityService securityService;
 
     // ======================== Alertes ========================
 
@@ -63,6 +65,7 @@ public class AlerteController {
     @IsAuthenticated
     public ResponseEntity<ApiResponse<List<AlerteResponse>>> getAlertesByEtudiant(
             @PathVariable Long etudiantId) {
+        securityService.verifierAccesEtudiant(etudiantId);
         List<Alerte> alertes = alerteService.getAlertesByEtudiant(etudiantId);
         return ResponseEntity.ok(ApiResponse.success(alerteMapper.toAlerteResponseList(alertes)));
     }

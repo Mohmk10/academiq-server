@@ -17,13 +17,14 @@ import com.academiq.entity.Note;
 import com.academiq.entity.Utilisateur;
 import com.academiq.mapper.NoteMapper;
 import com.academiq.security.IsAdmin;
-import com.academiq.security.IsAdminOrResponsable;
+import com.academiq.security.IsAllExceptEtudiant;
 import com.academiq.security.IsAuthenticated;
 import com.academiq.security.IsEnseignantOrAdmin;
 import com.academiq.service.HistoriqueNoteService;
 import com.academiq.service.ImportNotesService;
 import com.academiq.service.NoteService;
 import com.academiq.service.SaisieEnMasseService;
+import com.academiq.service.SecurityService;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -60,6 +61,7 @@ public class NoteController {
     private final SaisieEnMasseService saisieEnMasseService;
     private final HistoriqueNoteService historiqueNoteService;
     private final ImportNotesService importNotesService;
+    private final SecurityService securityService;
 
     // ======================== Évaluations ========================
 
@@ -67,30 +69,34 @@ public class NoteController {
     @IsEnseignantOrAdmin
     public ResponseEntity<ApiResponse<EvaluationResponse>> creerEvaluation(
             @Valid @RequestBody EvaluationRequest request) {
+        securityService.verifierAccesModule(request.getModuleFormationId());
         Evaluation evaluation = noteService.createEvaluation(noteMapper.toEvaluation(request));
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Évaluation créée avec succès", noteMapper.toEvaluationResponse(evaluation)));
     }
 
     @GetMapping("/evaluations/module/{moduleId}")
-    @IsEnseignantOrAdmin
+    @IsAllExceptEtudiant
     public ResponseEntity<ApiResponse<List<EvaluationResponse>>> getEvaluationsParModule(
             @PathVariable Long moduleId) {
+        securityService.verifierAccesModule(moduleId);
         return ResponseEntity.ok(ApiResponse.success(
                 noteMapper.toEvaluationResponseList(noteService.getEvaluationsByModule(moduleId))));
     }
 
     @GetMapping("/evaluations/module/{moduleId}/promotion/{promotionId}")
-    @IsEnseignantOrAdmin
+    @IsAllExceptEtudiant
     public ResponseEntity<ApiResponse<List<EvaluationResponse>>> getEvaluationsParModuleEtPromotion(
             @PathVariable Long moduleId, @PathVariable Long promotionId) {
+        securityService.verifierAccesModule(moduleId);
         return ResponseEntity.ok(ApiResponse.success(
                 noteMapper.toEvaluationResponseList(noteService.getEvaluationsByModuleAndPromotion(moduleId, promotionId))));
     }
 
     @GetMapping("/evaluations/{id}")
-    @IsEnseignantOrAdmin
+    @IsAllExceptEtudiant
     public ResponseEntity<ApiResponse<EvaluationResponse>> getEvaluation(@PathVariable Long id) {
+        securityService.verifierAccesEvaluation(id);
         return ResponseEntity.ok(ApiResponse.success(
                 noteMapper.toEvaluationResponse(noteService.getEvaluationById(id))));
     }
@@ -99,6 +105,7 @@ public class NoteController {
     @IsEnseignantOrAdmin
     public ResponseEntity<ApiResponse<EvaluationResponse>> modifierEvaluation(
             @PathVariable Long id, @Valid @RequestBody EvaluationRequest request) {
+        securityService.verifierAccesEvaluation(id);
         Evaluation data = noteMapper.toEvaluation(request);
         Evaluation updated = noteService.updateEvaluation(id, data);
         return ResponseEntity.ok(ApiResponse.success("Évaluation modifiée avec succès",
@@ -115,6 +122,7 @@ public class NoteController {
     @PatchMapping("/evaluations/{id}/terminer")
     @IsEnseignantOrAdmin
     public ResponseEntity<ApiResponse<Void>> terminerSaisie(@PathVariable Long id) {
+        securityService.verifierAccesEvaluation(id);
         noteService.terminerSaisie(id);
         return ResponseEntity.ok(ApiResponse.success("Saisie terminée avec succès"));
     }
@@ -126,6 +134,7 @@ public class NoteController {
     public ResponseEntity<ApiResponse<NoteResponse>> saisirNote(
             @Valid @RequestBody NoteSaisieRequest request,
             @AuthenticationPrincipal Utilisateur utilisateur) {
+        securityService.verifierAccesEvaluation(request.getEvaluationId());
         Note note = noteService.saisirNote(
                 request.getEvaluationId(), request.getEtudiantId(),
                 request.getValeur(), request.isAbsent(),
@@ -139,6 +148,7 @@ public class NoteController {
     public ResponseEntity<ApiResponse<List<NoteResponse>>> saisirNotesEnMasse(
             @Valid @RequestBody NoteSaisieEnMasseRequest request,
             @AuthenticationPrincipal Utilisateur utilisateur) {
+        securityService.verifierAccesEvaluation(request.getEvaluationId());
         List<Note> notes = noteService.saisirNotesEnMasse(
                 request.getEvaluationId(), request.getNotes(), utilisateur.getId());
         return ResponseEntity.status(HttpStatus.CREATED)
@@ -146,9 +156,10 @@ public class NoteController {
     }
 
     @GetMapping("/evaluation/{evaluationId}")
-    @IsEnseignantOrAdmin
+    @IsAllExceptEtudiant
     public ResponseEntity<ApiResponse<List<NoteResponse>>> getNotesByEvaluation(
             @PathVariable Long evaluationId) {
+        securityService.verifierAccesEvaluation(evaluationId);
         return ResponseEntity.ok(ApiResponse.success(
                 noteMapper.toNoteResponseList(noteService.getNotesByEvaluation(evaluationId))));
     }
@@ -157,6 +168,7 @@ public class NoteController {
     @IsAuthenticated
     public ResponseEntity<ApiResponse<List<NoteResponse>>> getNotesByEtudiant(
             @PathVariable Long etudiantId) {
+        securityService.verifierAccesEtudiant(etudiantId);
         return ResponseEntity.ok(ApiResponse.success(
                 noteMapper.toNoteResponseList(noteService.getNotesByEtudiant(etudiantId))));
     }
@@ -165,6 +177,7 @@ public class NoteController {
     @IsAuthenticated
     public ResponseEntity<ApiResponse<List<NoteResponse>>> getNotesByEtudiantAndModule(
             @PathVariable Long etudiantId, @PathVariable Long moduleId) {
+        securityService.verifierAccesEtudiant(etudiantId);
         return ResponseEntity.ok(ApiResponse.success(
                 noteMapper.toNoteResponseList(noteService.getNotesByEtudiantAndModule(etudiantId, moduleId))));
     }
@@ -179,9 +192,10 @@ public class NoteController {
     // ======================== Statistiques ========================
 
     @GetMapping("/evaluations/{id}/statistiques")
-    @IsEnseignantOrAdmin
+    @IsAllExceptEtudiant
     public ResponseEntity<ApiResponse<StatistiquesEvaluationDTO>> getStatistiquesEvaluation(
             @PathVariable Long id) {
+        securityService.verifierAccesEvaluation(id);
         return ResponseEntity.ok(ApiResponse.success(
                 noteService.getStatistiquesEvaluation(id)));
     }
@@ -189,7 +203,7 @@ public class NoteController {
     // ======================== Verrouillage ========================
 
     @PatchMapping("/evaluations/{id}/verrouiller")
-    @IsAdminOrResponsable
+    @IsAdmin
     public ResponseEntity<ApiResponse<Void>> verrouillerEvaluation(@PathVariable Long id) {
         noteService.verrouillerEvaluation(id);
         return ResponseEntity.ok(ApiResponse.success("Évaluation verrouillée avec succès"));
@@ -205,7 +219,7 @@ public class NoteController {
     // ======================== Historique ========================
 
     @GetMapping("/{noteId}/historique")
-    @IsEnseignantOrAdmin
+    @IsAllExceptEtudiant
     public ResponseEntity<ApiResponse<List<HistoriqueNoteResponse>>> getHistoriqueNote(
             @PathVariable Long noteId) {
         var historiques = historiqueNoteService.getHistoriqueByNote(noteId);
@@ -232,6 +246,7 @@ public class NoteController {
     @IsEnseignantOrAdmin
     public ResponseEntity<ApiResponse<List<NotePrepopuleeDTO>>> preparerSaisie(
             @PathVariable Long evaluationId) {
+        securityService.verifierAccesEvaluation(evaluationId);
         return ResponseEntity.ok(ApiResponse.success(
                 saisieEnMasseService.preparerSaisie(evaluationId)));
     }
@@ -242,6 +257,7 @@ public class NoteController {
             @PathVariable Long evaluationId,
             @Valid @RequestBody List<com.academiq.dto.note.NoteSaisieDTO> notes,
             @AuthenticationPrincipal Utilisateur utilisateur) {
+        securityService.verifierAccesEvaluation(evaluationId);
         SaisieEnMasseResult result = saisieEnMasseService.saisirNotesClasse(
                 evaluationId, notes, utilisateur.getId());
         return ResponseEntity.ok(ApiResponse.success("Saisie en masse terminée", result));
@@ -250,9 +266,10 @@ public class NoteController {
     // ======================== Récapitulatifs ========================
 
     @GetMapping("/modules/{moduleId}/promotion/{promotionId}/recapitulatif")
-    @IsEnseignantOrAdmin
+    @IsAllExceptEtudiant
     public ResponseEntity<ApiResponse<RecapitulatifModuleDTO>> getRecapitulatifModule(
             @PathVariable Long moduleId, @PathVariable Long promotionId) {
+        securityService.verifierAccesModule(moduleId);
         return ResponseEntity.ok(ApiResponse.success(
                 noteService.getRecapitulatifModule(moduleId, promotionId)));
     }
@@ -261,6 +278,7 @@ public class NoteController {
     @IsAuthenticated
     public ResponseEntity<ApiResponse<RecapitulatifEtudiantDTO>> getRecapitulatifEtudiant(
             @PathVariable Long etudiantId, @PathVariable Long promotionId) {
+        securityService.verifierAccesEtudiant(etudiantId);
         return ResponseEntity.ok(ApiResponse.success(
                 noteService.getRecapitulatifEtudiant(etudiantId, promotionId)));
     }
@@ -273,6 +291,7 @@ public class NoteController {
             @PathVariable Long evaluationId,
             @RequestParam("fichier") MultipartFile fichier,
             @AuthenticationPrincipal Utilisateur utilisateur) {
+        securityService.verifierAccesEvaluation(evaluationId);
         SaisieEnMasseResult result = importNotesService.importerNotesExcel(
                 evaluationId, fichier, utilisateur.getId());
         return ResponseEntity.ok(ApiResponse.success("Import Excel terminé", result));
@@ -281,6 +300,7 @@ public class NoteController {
     @GetMapping("/evaluations/{evaluationId}/template-excel")
     @IsEnseignantOrAdmin
     public ResponseEntity<byte[]> telechargerTemplateExcel(@PathVariable Long evaluationId) throws IOException {
+        securityService.verifierAccesEvaluation(evaluationId);
         Workbook workbook = importNotesService.genererTemplateExcel(evaluationId);
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         workbook.write(out);
