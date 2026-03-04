@@ -59,6 +59,7 @@ public class NoteService {
     private final PromotionRepository promotionRepository;
     private final NoteValidationService noteValidationService;
     private final HistoriqueNoteService historiqueNoteService;
+    private final DetectionAlerteService detectionAlerteService;
 
     // ======================== Évaluations ========================
 
@@ -186,6 +187,7 @@ public class NoteService {
         }
 
         log.info("Note saisie pour étudiant {} - évaluation {} : {}", etudiantId, evaluationId, valeur);
+        analyserAlertesApresNote(saved);
         return saved;
     }
 
@@ -198,6 +200,17 @@ public class NoteService {
             notes.add(note);
         }
         return notes;
+    }
+
+    private void analyserAlertesApresNote(Note note) {
+        try {
+            Long etudiantId = note.getEtudiant().getId();
+            Long promotionId = note.getEvaluation().getPromotion().getId();
+            detectionAlerteService.analyserEtudiant(etudiantId, promotionId);
+        } catch (Exception e) {
+            log.warn("Erreur analyse alertes pour étudiant {} : {}",
+                    note.getEtudiant().getId(), e.getMessage());
+        }
     }
 
     @Transactional
