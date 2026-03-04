@@ -1,6 +1,7 @@
 package com.academiq.service;
 
 import com.academiq.entity.Enseignant;
+import com.academiq.entity.Evaluation;
 import com.academiq.entity.Role;
 import com.academiq.entity.Utilisateur;
 import com.academiq.exception.BusinessException;
@@ -8,6 +9,7 @@ import com.academiq.exception.ResourceNotFoundException;
 import com.academiq.repository.AffectationRepository;
 import com.academiq.repository.EnseignantRepository;
 import com.academiq.repository.EtudiantRepository;
+import com.academiq.repository.EvaluationRepository;
 import com.academiq.repository.UtilisateurRepository;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
@@ -25,6 +27,7 @@ public class SecurityService {
     private final EtudiantRepository etudiantRepository;
     private final EnseignantRepository enseignantRepository;
     private final AffectationRepository affectationRepository;
+    private final EvaluationRepository evaluationRepository;
 
     private static final Logger log = LoggerFactory.getLogger(SecurityService.class);
 
@@ -128,5 +131,93 @@ public class SecurityService {
         if (count <= 1) {
             throw new BusinessException("Au moins un SUPER_ADMIN actif doit exister dans le système");
         }
+    }
+
+    /**
+     * Vérifie l'accès aux données d'un étudiant.
+     * SA, ADMIN, RESP_PEDA : accès libre.
+     * ETUDIANT : uniquement ses propres données.
+     * Autres rôles : refusé.
+     */
+    public void verifierAccesEtudiant(Long etudiantId) {
+        Utilisateur current = getCurrentUser();
+        Role role = current.getRole();
+
+        if (role == Role.SUPER_ADMIN || role == Role.ADMIN || role == Role.RESPONSABLE_PEDAGOGIQUE) {
+            return;
+        }
+
+        if (role == Role.ETUDIANT) {
+            boolean estProprietaire = etudiantRepository.findByUtilisateurId(current.getId())
+                    .map(e -> e.getId().equals(etudiantId))
+                    .orElse(false);
+            if (estProprietaire) {
+                return;
+            }
+        }
+
+        throw new AccessDeniedException("Accès non autorisé aux données de cet étudiant");
+    }
+
+    /**
+     * Vérifie l'accès aux données d'un enseignant.
+     * SA, ADMIN : accès libre.
+     * ENSEIGNANT : uniquement ses propres données.
+     * Autres rôles : refusé.
+     */
+    public void verifierAccesEnseignant(Long enseignantId) {
+        Utilisateur current = getCurrentUser();
+        Role role = current.getRole();
+
+        if (role == Role.SUPER_ADMIN || role == Role.ADMIN) {
+            return;
+        }
+
+        if (role == Role.ENSEIGNANT) {
+            boolean estProprietaire = enseignantRepository.findByUtilisateurId(current.getId())
+                    .map(e -> e.getId().equals(enseignantId))
+                    .orElse(false);
+            if (estProprietaire) {
+                return;
+            }
+        }
+
+        throw new AccessDeniedException("Accès non autorisé aux données de cet enseignant");
+    }
+
+    /**
+     * Vérifie l'accès à un module.
+     * SA, ADMIN, RESP_PEDA : accès libre.
+     * ENSEIGNANT : uniquement s'il est affecté au module.
+     * Autres rôles : refusé.
+     */
+    public void verifierAccesModule(Long moduleId) {
+        Utilisateur current = getCurrentUser();
+        Role role = current.getRole();
+
+        if (role == Role.SUPER_ADMIN || role == Role.ADMIN || role == Role.RESPONSABLE_PEDAGOGIQUE) {
+            return;
+        }
+
+        if (role == Role.ENSEIGNANT) {
+            Enseignant enseignant = enseignantRepository.findByUtilisateurId(current.getId())
+                    .orElse(null);
+            if (enseignant != null && affectationRepository
+                    .existsByEnseignantIdAndModuleFormationIdAndActifTrue(enseignant.getId(), moduleId)) {
+                return;
+            }
+        }
+
+        throw new AccessDeniedException("Accès non autorisé à ce module");
+    }
+
+    /**
+     * Vérifie l'accès à une évaluation via le module associé.
+     * Délègue à verifierAccesModule après résolution du moduleId.
+     */
+    public void verifierAccesEvaluation(Long evaluationId) {
+        Evaluation evaluation = evaluationRepository.findById(evaluationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Évaluation", "id", evaluationId));
+        verifierAccesModule(evaluation.getModuleFormation().getId());
     }
 }

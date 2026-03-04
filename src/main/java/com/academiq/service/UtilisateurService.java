@@ -74,6 +74,11 @@ public class UtilisateurService {
             throw new ForbiddenException("Le rôle SUPER_ADMIN ne peut pas être attribué via l'API");
         }
 
+        Utilisateur current = securityService.getCurrentUser();
+        if (current.getRole() == Role.ADMIN && request.getRole() == Role.ADMIN) {
+            throw new ForbiddenException("Un ADMIN ne peut pas créer un autre ADMIN");
+        }
+
         if (utilisateurRepository.existsByEmail(request.getEmail())) {
             throw new DuplicateResourceException("Utilisateur", "email", request.getEmail());
         }

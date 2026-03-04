@@ -69,6 +69,9 @@ public class UtilisateurController {
 
         Page<Utilisateur> utilisateurs;
         if (role != null) {
+            if (current.getRole() == Role.ADMIN && role == Role.SUPER_ADMIN) {
+                throw new com.academiq.exception.ForbiddenException("Accès non autorisé à la liste des SUPER_ADMIN");
+            }
             utilisateurs = utilisateurService.findByRole(role, PageRequest.of(page, size, sort));
         } else if (current.getRole() == Role.ADMIN) {
             utilisateurs = utilisateurService.findAllExcludingRole(Role.SUPER_ADMIN, PageRequest.of(page, size, sort));
