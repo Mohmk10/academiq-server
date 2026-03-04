@@ -4,6 +4,19 @@
 -- Mot de passe : SuperAdmin@2026
 -- ============================================================
 
+-- Migration : ajouter SUPER_ADMIN a la contrainte de role
+-- (necessaire si la table a ete creee avant l'ajout du role SUPER_ADMIN)
+ALTER TABLE utilisateurs DROP CONSTRAINT IF EXISTS utilisateurs_role_check;
+ALTER TABLE utilisateurs ADD CONSTRAINT utilisateurs_role_check
+    CHECK (role::text = ANY (ARRAY[
+        'SUPER_ADMIN'::character varying,
+        'ADMIN'::character varying,
+        'RESPONSABLE_PEDAGOGIQUE'::character varying,
+        'ENSEIGNANT'::character varying,
+        'ETUDIANT'::character varying
+    ]::text[]));
+
+-- Creation du SUPER_ADMIN (idempotent)
 DO $$
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM utilisateurs WHERE email = 'superadmin@academiq.sn') THEN
