@@ -42,21 +42,23 @@ public class NoteMapper {
     }
 
     public EvaluationResponse toEvaluationResponse(Evaluation evaluation) {
+        ModuleFormation module = evaluation.getModuleFormation();
+        Promotion promotion = evaluation.getPromotion();
         return EvaluationResponse.builder()
                 .id(evaluation.getId())
                 .nom(evaluation.getNom())
-                .type(evaluation.getType().name())
-                .statut(evaluation.getStatut().name())
+                .type(evaluation.getType() != null ? evaluation.getType().name() : null)
+                .statut(evaluation.getStatut() != null ? evaluation.getStatut().name() : null)
                 .dateEvaluation(evaluation.getDateEvaluation())
                 .noteMaximale(evaluation.getNoteMaximale())
                 .coefficient(evaluation.getCoefficient())
                 .description(evaluation.getDescription())
-                .moduleId(evaluation.getModuleFormation().getId())
-                .moduleNom(evaluation.getModuleFormation().getNom())
-                .promotionId(evaluation.getPromotion().getId())
-                .promotionNom(evaluation.getPromotion().getNom())
+                .moduleId(module != null ? module.getId() : null)
+                .moduleNom(module != null ? module.getNom() : null)
+                .promotionId(promotion != null ? promotion.getId() : null)
+                .promotionNom(promotion != null ? promotion.getNom() : null)
                 .nombreNotesSaisies(noteRepository.countByEvaluationIdAndValeurIsNotNull(evaluation.getId()))
-                .nombreInscrits(inscriptionRepository.countByPromotionId(evaluation.getPromotion().getId()))
+                .nombreInscrits(promotion != null ? inscriptionRepository.countByPromotionId(promotion.getId()) : 0)
                 .moyenne(noteRepository.calculerMoyenneEvaluation(evaluation.getId()))
                 .noteMin(noteRepository.findNoteMinByEvaluation(evaluation.getId()))
                 .noteMax(noteRepository.findNoteMaxByEvaluation(evaluation.getId()))
@@ -68,17 +70,19 @@ public class NoteMapper {
     }
 
     public NoteResponse toNoteResponse(Note note) {
-        Utilisateur etudiantUser = note.getEtudiant().getUtilisateur();
+        var etudiant = note.getEtudiant();
+        Utilisateur etudiantUser = etudiant != null ? etudiant.getUtilisateur() : null;
+        var evaluation = note.getEvaluation();
         return NoteResponse.builder()
                 .id(note.getId())
                 .valeur(note.getValeur())
                 .absent(note.isAbsent())
                 .commentaire(note.getCommentaire())
-                .etudiantId(note.getEtudiant().getId())
-                .etudiantNom(etudiantUser.getPrenom() + " " + etudiantUser.getNom())
-                .etudiantMatricule(note.getEtudiant().getMatricule())
-                .evaluationId(note.getEvaluation().getId())
-                .evaluationNom(note.getEvaluation().getNom())
+                .etudiantId(etudiant != null ? etudiant.getId() : null)
+                .etudiantNom(etudiantUser != null ? etudiantUser.getPrenom() + " " + etudiantUser.getNom() : null)
+                .etudiantMatricule(etudiant != null ? etudiant.getMatricule() : null)
+                .evaluationId(evaluation != null ? evaluation.getId() : null)
+                .evaluationNom(evaluation != null ? evaluation.getNom() : null)
                 .saisiePar(note.getSaisiePar() != null
                         ? note.getSaisiePar().getPrenom() + " " + note.getSaisiePar().getNom()
                         : null)

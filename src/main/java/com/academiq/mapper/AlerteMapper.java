@@ -16,20 +16,21 @@ import java.util.Map;
 public class AlerteMapper {
 
     public AlerteResponse toAlerteResponse(Alerte alerte) {
-        Utilisateur etudiantUser = alerte.getEtudiant().getUtilisateur();
+        var etudiant = alerte.getEtudiant();
+        Utilisateur etudiantUser = etudiant != null ? etudiant.getUtilisateur() : null;
 
         AlerteResponse.AlerteResponseBuilder builder = AlerteResponse.builder()
                 .id(alerte.getId())
-                .type(alerte.getType().name())
-                .niveau(alerte.getNiveau().name())
-                .statut(alerte.getStatut().name())
+                .type(alerte.getType() != null ? alerte.getType().name() : null)
+                .niveau(alerte.getNiveau() != null ? alerte.getNiveau().name() : null)
+                .statut(alerte.getStatut() != null ? alerte.getStatut().name() : null)
                 .titre(alerte.getTitre())
                 .message(alerte.getMessage())
                 .valeurDetectee(alerte.getValeurDetectee())
                 .seuilAlerte(alerte.getSeuilAlerte())
-                .etudiantId(alerte.getEtudiant().getId())
-                .etudiantNom(etudiantUser.getPrenom() + " " + etudiantUser.getNom())
-                .etudiantMatricule(alerte.getEtudiant().getMatricule())
+                .etudiantId(etudiant != null ? etudiant.getId() : null)
+                .etudiantNom(etudiantUser != null ? etudiantUser.getPrenom() + " " + etudiantUser.getNom() : null)
+                .etudiantMatricule(etudiant != null ? etudiant.getMatricule() : null)
                 .createdAt(alerte.getCreatedAt());
 
         if (alerte.getPromotion() != null) {

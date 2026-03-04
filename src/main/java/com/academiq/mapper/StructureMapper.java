@@ -81,13 +81,14 @@ public class StructureMapper {
     }
 
     public NiveauResponse toNiveauResponse(Niveau niveau) {
+        Filiere filiere = niveau.getFiliere();
         return NiveauResponse.builder()
                 .id(niveau.getId())
-                .niveau(niveau.getNiveau().name())
+                .niveau(niveau.getNiveau() != null ? niveau.getNiveau().name() : null)
                 .nombreSemestres(niveau.getNombreSemestres())
                 .creditsRequis(niveau.getCreditsRequis())
-                .filiereId(niveau.getFiliere().getId())
-                .filiereNom(niveau.getFiliere().getNom())
+                .filiereId(filiere != null ? filiere.getId() : null)
+                .filiereNom(filiere != null ? filiere.getNom() : null)
                 .nombrePromotions(niveau.getPromotions() != null ? niveau.getPromotions().size() : 0)
                 .build();
     }
@@ -109,6 +110,7 @@ public class StructureMapper {
 
     public PromotionResponse toPromotionResponse(Promotion promotion) {
         Niveau niveau = promotion.getNiveau();
+        Filiere filiere = niveau != null ? niveau.getFiliere() : null;
         return PromotionResponse.builder()
                 .id(promotion.getId())
                 .anneeUniversitaire(promotion.getAnneeUniversitaire())
@@ -116,9 +118,9 @@ public class StructureMapper {
                 .dateDebut(promotion.getDateDebut())
                 .dateFin(promotion.getDateFin())
                 .actif(promotion.isActif())
-                .niveauId(niveau.getId())
-                .niveauNom(niveau.getNiveau().name())
-                .filiereNom(niveau.getFiliere().getNom())
+                .niveauId(niveau != null ? niveau.getId() : null)
+                .niveauNom(niveau != null && niveau.getNiveau() != null ? niveau.getNiveau().name() : null)
+                .filiereNom(filiere != null ? filiere.getNom() : null)
                 .nombreInscrits(inscriptionRepository.countByPromotionId(promotion.getId()))
                 .build();
     }
@@ -137,11 +139,12 @@ public class StructureMapper {
     }
 
     public SemestreResponse toSemestreResponse(Semestre semestre) {
+        Niveau niveau = semestre.getNiveau();
         return SemestreResponse.builder()
                 .id(semestre.getId())
-                .semestre(semestre.getSemestre().name())
+                .semestre(semestre.getSemestre() != null ? semestre.getSemestre().name() : null)
                 .nom(semestre.getNom())
-                .niveauId(semestre.getNiveau().getId())
+                .niveauId(niveau != null ? niveau.getId() : null)
                 .nombreUes(semestre.getUniteEnseignements() != null ? semestre.getUniteEnseignements().size() : 0)
                 .build();
     }
@@ -163,6 +166,7 @@ public class StructureMapper {
     }
 
     public UeResponse toUeResponse(UniteEnseignement ue) {
+        Semestre semestre = ue.getSemestre();
         return UeResponse.builder()
                 .id(ue.getId())
                 .code(ue.getCode())
@@ -170,8 +174,8 @@ public class StructureMapper {
                 .description(ue.getDescription())
                 .credits(ue.getCredits())
                 .coefficient(ue.getCoefficient())
-                .semestreId(ue.getSemestre().getId())
-                .semestreNom(ue.getSemestre().getNom())
+                .semestreId(semestre != null ? semestre.getId() : null)
+                .semestreNom(semestre != null ? semestre.getNom() : null)
                 .nombreModules(ue.getModules() != null ? ue.getModules().size() : 0)
                 .build();
     }
@@ -204,6 +208,7 @@ public class StructureMapper {
     }
 
     public ModuleResponse toModuleResponse(ModuleFormation module) {
+        UniteEnseignement ue = module.getUniteEnseignement();
         return ModuleResponse.builder()
                 .id(module.getId())
                 .code(module.getCode())
@@ -217,8 +222,8 @@ public class StructureMapper {
                 .volumeHoraireTotal(module.getVolumeHoraireTotal())
                 .ponderationCC(module.getPonderationCC())
                 .ponderationExamen(module.getPonderationExamen())
-                .ueId(module.getUniteEnseignement().getId())
-                .ueNom(module.getUniteEnseignement().getNom())
+                .ueId(ue != null ? ue.getId() : null)
+                .ueNom(ue != null ? ue.getNom() : null)
                 .enseignantId(module.getEnseignant() != null ? module.getEnseignant().getId() : null)
                 .enseignantNom(resolveEnseignantNom(module.getEnseignant()))
                 .build();
@@ -231,16 +236,18 @@ public class StructureMapper {
     // ======================== Inscription ========================
 
     public InscriptionResponse toInscriptionResponse(Inscription inscription) {
-        Utilisateur utilisateur = inscription.getEtudiant().getUtilisateur();
+        var etudiant = inscription.getEtudiant();
+        Utilisateur utilisateur = etudiant != null ? etudiant.getUtilisateur() : null;
+        Promotion promotion = inscription.getPromotion();
         return InscriptionResponse.builder()
                 .id(inscription.getId())
-                .etudiantId(inscription.getEtudiant().getId())
-                .etudiantNom(utilisateur.getPrenom() + " " + utilisateur.getNom())
-                .etudiantMatricule(inscription.getEtudiant().getMatricule())
-                .promotionId(inscription.getPromotion().getId())
-                .promotionNom(inscription.getPromotion().getNom())
+                .etudiantId(etudiant != null ? etudiant.getId() : null)
+                .etudiantNom(utilisateur != null ? utilisateur.getPrenom() + " " + utilisateur.getNom() : null)
+                .etudiantMatricule(etudiant != null ? etudiant.getMatricule() : null)
+                .promotionId(promotion != null ? promotion.getId() : null)
+                .promotionNom(promotion != null ? promotion.getNom() : null)
                 .dateInscription(inscription.getDateInscription())
-                .statut(inscription.getStatut().name())
+                .statut(inscription.getStatut() != null ? inscription.getStatut().name() : null)
                 .redoublant(inscription.isRedoublant())
                 .build();
     }
@@ -252,15 +259,18 @@ public class StructureMapper {
     // ======================== Affectation ========================
 
     public AffectationResponse toAffectationResponse(Affectation affectation) {
-        Utilisateur utilisateur = affectation.getEnseignant().getUtilisateur();
+        var enseignant = affectation.getEnseignant();
+        Utilisateur utilisateur = enseignant != null ? enseignant.getUtilisateur() : null;
+        ModuleFormation module = affectation.getModuleFormation();
+        Promotion promotion = affectation.getPromotion();
         return AffectationResponse.builder()
                 .id(affectation.getId())
-                .enseignantId(affectation.getEnseignant().getId())
-                .enseignantNom(utilisateur.getPrenom() + " " + utilisateur.getNom())
-                .moduleId(affectation.getModuleFormation().getId())
-                .moduleNom(affectation.getModuleFormation().getNom())
-                .promotionId(affectation.getPromotion().getId())
-                .promotionNom(affectation.getPromotion().getNom())
+                .enseignantId(enseignant != null ? enseignant.getId() : null)
+                .enseignantNom(utilisateur != null ? utilisateur.getPrenom() + " " + utilisateur.getNom() : null)
+                .moduleId(module != null ? module.getId() : null)
+                .moduleNom(module != null ? module.getNom() : null)
+                .promotionId(promotion != null ? promotion.getId() : null)
+                .promotionNom(promotion != null ? promotion.getNom() : null)
                 .anneeUniversitaire(affectation.getAnneeUniversitaire())
                 .actif(affectation.isActif())
                 .build();
