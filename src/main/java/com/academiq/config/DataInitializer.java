@@ -41,7 +41,7 @@ public class DataInitializer implements CommandLineRunner {
         }
 
         Utilisateur superAdmin = Utilisateur.builder()
-                .nom("Kouyaté")
+                .nom("Kouyat\u00e9")
                 .prenom("Makan")
                 .email("superadmin@academiq.sn")
                 .motDePasse(passwordEncoder.encode("SuperAdmin@2026"))
@@ -55,7 +55,7 @@ public class DataInitializer implements CommandLineRunner {
         Admin adminProfile = Admin.builder()
                 .utilisateur(superAdmin)
                 .fonction("Super Administrateur")
-                .departement("Direction Générale")
+                .departement("Direction G\u00e9n\u00e9rale")
                 .niveau(NiveauAdmin.SUPER_ADMIN)
                 .build();
 

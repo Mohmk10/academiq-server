@@ -1,22 +1,25 @@
 -- ============================================================
 -- RESET COMPLET DE LA BASE AcademiQ
--- Supprime TOUTES les données SAUF le SUPER_ADMIN
+-- Supprime TOUTES les donn\u00e9es (le DataInitializer recr\u00e9e le SUPER_ADMIN)
 -- Ordre de suppression : enfants d'abord (respect des FK)
 -- ============================================================
 
--- 1. Données de notes et historique
+-- 1. Audit logs
+DELETE FROM audit_logs;
+
+-- 2. Donn\u00e9es de notes et historique
 DELETE FROM historique_notes;
 DELETE FROM notes;
 DELETE FROM evaluations;
 
--- 2. Alertes
+-- 3. Alertes
 DELETE FROM alertes;
 
--- 3. Relations
+-- 4. Relations
 DELETE FROM affectations;
 DELETE FROM inscriptions;
 
--- 4. Structure académique
+-- 5. Structure acad\u00e9mique
 DELETE FROM modules_formation;
 DELETE FROM unites_enseignement;
 DELETE FROM semestres;
@@ -24,22 +27,29 @@ DELETE FROM promotions;
 DELETE FROM niveaux;
 DELETE FROM filieres;
 
--- 5. Profils (sauf SUPER_ADMIN)
+-- 6. Profils
 DELETE FROM etudiants;
 DELETE FROM enseignants;
-DELETE FROM admins WHERE utilisateur_id != (SELECT id FROM utilisateurs WHERE email = 'superadmin@academiq.sn');
+DELETE FROM admins;
 
--- 6. Règles d'alerte (seront recréées par le DataInitializer)
+-- 7. R\u00e8gles d'alerte (recr\u00e9\u00e9es par le DataInitializer)
 DELETE FROM regles_alerte;
 
--- 7. Utilisateurs (sauf SUPER_ADMIN)
-DELETE FROM utilisateurs WHERE email != 'superadmin@academiq.sn';
+-- 8. Utilisateurs (le DataInitializer recr\u00e9era le SUPER_ADMIN)
+DELETE FROM utilisateurs;
 
--- Verification
+-- V\u00e9rification
 DO $$
 DECLARE
-    nb_users INTEGER;
+    r RECORD;
 BEGIN
-    SELECT COUNT(*) INTO nb_users FROM utilisateurs;
-    RAISE NOTICE 'Reset termine. Utilisateurs restants : %', nb_users;
+    FOR r IN (
+        SELECT table_name,
+               (xpath('/row/cnt/text()', query_to_xml(format('SELECT count(*) AS cnt FROM %I', table_name), false, true, '')))[1]::text::int AS cnt
+        FROM information_schema.tables
+        WHERE table_schema = 'public' AND table_type = 'BASE TABLE'
+        ORDER BY table_name
+    ) LOOP
+        RAISE NOTICE '% : % lignes', r.table_name, r.cnt;
+    END LOOP;
 END $$;
