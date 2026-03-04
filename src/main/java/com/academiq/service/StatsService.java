@@ -8,6 +8,7 @@ import com.academiq.dto.stats.DashboardEnseignantDTO;
 import com.academiq.dto.stats.DashboardEtudiantDTO;
 import com.academiq.dto.stats.ModuleEnseignantStatsDTO;
 import com.academiq.dto.stats.NoteRecenteDTO;
+import com.academiq.dto.stats.SystemStatsDTO;
 import com.academiq.entity.Alerte;
 import com.academiq.entity.Enseignant;
 import com.academiq.entity.Filiere;
@@ -677,6 +678,25 @@ public class StatsService {
         if (valeurs.isEmpty()) return null;
         double somme = valeurs.stream().mapToDouble(Double::doubleValue).sum();
         return arrondir(somme / valeurs.size());
+    }
+
+    public SystemStatsDTO getSystemStats() {
+        long total = utilisateurRepository.count();
+        long actifs = utilisateurRepository.countByActifTrue();
+
+        return SystemStatsDTO.builder()
+                .totalUtilisateurs(total)
+                .utilisateursActifs(actifs)
+                .totalEtudiants(utilisateurRepository.countByRole(Role.ETUDIANT))
+                .totalEnseignants(utilisateurRepository.countByRole(Role.ENSEIGNANT))
+                .totalAdmins(utilisateurRepository.countByRole(Role.ADMIN)
+                        + utilisateurRepository.countByRole(Role.SUPER_ADMIN))
+                .totalResponsables(utilisateurRepository.countByRole(Role.RESPONSABLE_PEDAGOGIQUE))
+                .comptesInactifs(total - actifs)
+                .totalEvaluations(evaluationRepository.count())
+                .totalNotes(noteRepository.count())
+                .alertesActives(alerteRepository.countByStatut(StatutAlerte.ACTIVE))
+                .build();
     }
 
     private double arrondir(double valeur) {

@@ -1,6 +1,7 @@
 package com.academiq.controller;
 
 import com.academiq.dto.ApiResponse;
+import com.academiq.dto.stats.AuditLogResponse;
 import com.academiq.dto.stats.ComparaisonPromotionsDTO;
 import com.academiq.dto.stats.DashboardAdminDTO;
 import com.academiq.dto.stats.DashboardEnseignantDTO;
@@ -8,11 +9,14 @@ import com.academiq.dto.stats.DashboardEtudiantDTO;
 import com.academiq.dto.stats.DistributionNotesDTO;
 import com.academiq.dto.stats.EvolutionModuleDTO;
 import com.academiq.dto.stats.EvolutionPerformanceDTO;
+import com.academiq.dto.stats.SystemStatsDTO;
 import com.academiq.dto.stats.TauxReussiteDTO;
 import com.academiq.security.IsAdminOrResponsable;
 import com.academiq.security.IsAllExceptEtudiant;
 import com.academiq.security.IsAuthenticated;
 import com.academiq.security.IsEnseignantOrAdmin;
+import com.academiq.security.IsSuperAdmin;
+import com.academiq.service.AuditLogService;
 import com.academiq.service.SecurityService;
 import com.academiq.service.StatsService;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -25,6 +29,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/analytics")
@@ -34,6 +39,7 @@ public class AnalyticsController {
 
     private final StatsService statsService;
     private final SecurityService securityService;
+    private final AuditLogService auditLogService;
 
     // ======================== Dashboards ========================
 
@@ -134,5 +140,30 @@ public class AnalyticsController {
             @RequestParam List<Long> promotionIds) {
         return ResponseEntity.ok(ApiResponse.success(
                 statsService.comparerPromotions(promotionIds)));
+    }
+
+    // ======================== SUPER_ADMIN ========================
+
+    @GetMapping("/audit-logs/recent")
+    @IsSuperAdmin
+    public ResponseEntity<ApiResponse<List<AuditLogResponse>>> getRecentAuditLogs(
+            @RequestParam(defaultValue = "20") int limit) {
+        List<AuditLogResponse> logs = auditLogService.getRecentLogs(limit).stream()
+                .map(log -> AuditLogResponse.builder()
+                        .id(log.getId())
+                        .action(log.getAction().name())
+                        .performedBy(log.getPerformedBy())
+                        .targetUser(log.getTargetUser())
+                        .details(log.getDetails())
+                        .date(log.getDate())
+                        .build())
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(ApiResponse.success(logs));
+    }
+
+    @GetMapping("/system-stats")
+    @IsSuperAdmin
+    public ResponseEntity<ApiResponse<SystemStatsDTO>> getSystemStats() {
+        return ResponseEntity.ok(ApiResponse.success(statsService.getSystemStats()));
     }
 }
