@@ -18,8 +18,8 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import com.academiq.security.IsAuthenticated;
 import org.springframework.security.access.AccessDeniedException;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -39,7 +39,7 @@ public class RapportController {
     private final ModuleFormationRepository moduleFormationRepository;
 
     @GetMapping("/releve/etudiant/{etudiantId}/promotion/{promotionId}")
-    @PreAuthorize("isAuthenticated()")
+    @IsAuthenticated
     public ResponseEntity<byte[]> telechargerReleve(
             @PathVariable Long etudiantId,
             @PathVariable Long promotionId,
@@ -125,7 +125,8 @@ public class RapportController {
     }
 
     private void verifierAccesEtudiant(Long etudiantId, Utilisateur utilisateur) {
-        if (utilisateur.getRole() == Role.ADMIN
+        if (utilisateur.getRole() == Role.SUPER_ADMIN
+                || utilisateur.getRole() == Role.ADMIN
                 || utilisateur.getRole() == Role.RESPONSABLE_PEDAGOGIQUE) {
             return;
         }

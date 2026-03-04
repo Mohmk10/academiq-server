@@ -9,6 +9,7 @@ import com.academiq.dto.auth.RegisterRequest;
 import com.academiq.dto.auth.UtilisateurResponse;
 import com.academiq.entity.Utilisateur;
 import com.academiq.mapper.UtilisateurMapper;
+import com.academiq.security.IsAuthenticated;
 import com.academiq.service.AuthService;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -17,7 +18,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -59,14 +59,14 @@ public class AuthController {
     }
 
     @GetMapping("/me")
-    @PreAuthorize("isAuthenticated()")
+    @IsAuthenticated
     public ResponseEntity<ApiResponse<UtilisateurResponse>> me(@AuthenticationPrincipal Utilisateur utilisateur) {
         UtilisateurResponse response = utilisateurMapper.toResponse(utilisateur);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
     @PutMapping("/change-password")
-    @PreAuthorize("isAuthenticated()")
+    @IsAuthenticated
     public ResponseEntity<ApiResponse<Void>> changePassword(
             @AuthenticationPrincipal Utilisateur utilisateur,
             @Valid @RequestBody ChangePasswordRequest request) {

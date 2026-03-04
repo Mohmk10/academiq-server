@@ -18,6 +18,7 @@ import com.academiq.entity.Utilisateur;
 import com.academiq.mapper.NoteMapper;
 import com.academiq.security.IsAdmin;
 import com.academiq.security.IsAdminOrResponsable;
+import com.academiq.security.IsAuthenticated;
 import com.academiq.security.IsEnseignantOrAdmin;
 import com.academiq.service.HistoriqueNoteService;
 import com.academiq.service.ImportNotesService;
@@ -31,7 +32,6 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -154,7 +154,7 @@ public class NoteController {
     }
 
     @GetMapping("/etudiant/{etudiantId}")
-    @PreAuthorize("isAuthenticated()")
+    @IsAuthenticated
     public ResponseEntity<ApiResponse<List<NoteResponse>>> getNotesByEtudiant(
             @PathVariable Long etudiantId) {
         return ResponseEntity.ok(ApiResponse.success(
@@ -162,7 +162,7 @@ public class NoteController {
     }
 
     @GetMapping("/etudiant/{etudiantId}/module/{moduleId}")
-    @PreAuthorize("isAuthenticated()")
+    @IsAuthenticated
     public ResponseEntity<ApiResponse<List<NoteResponse>>> getNotesByEtudiantAndModule(
             @PathVariable Long etudiantId, @PathVariable Long moduleId) {
         return ResponseEntity.ok(ApiResponse.success(
@@ -170,7 +170,7 @@ public class NoteController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @IsAuthenticated
     public ResponseEntity<ApiResponse<NoteResponse>> getNote(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success(
                 noteMapper.toNoteResponse(noteService.getNoteById(id))));
@@ -258,7 +258,7 @@ public class NoteController {
     }
 
     @GetMapping("/etudiant/{etudiantId}/promotion/{promotionId}/recapitulatif")
-    @PreAuthorize("isAuthenticated()")
+    @IsAuthenticated
     public ResponseEntity<ApiResponse<RecapitulatifEtudiantDTO>> getRecapitulatifEtudiant(
             @PathVariable Long etudiantId, @PathVariable Long promotionId) {
         return ResponseEntity.ok(ApiResponse.success(

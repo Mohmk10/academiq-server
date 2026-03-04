@@ -14,6 +14,7 @@ import com.academiq.entity.Utilisateur;
 import com.academiq.mapper.AlerteMapper;
 import com.academiq.security.IsAdmin;
 import com.academiq.security.IsAdminOrResponsable;
+import com.academiq.security.IsAuthenticated;
 import com.academiq.security.IsEnseignantOrAdmin;
 import com.academiq.service.AlerteService;
 import com.academiq.service.DetectionAlerteService;
@@ -25,7 +26,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -60,7 +60,7 @@ public class AlerteController {
     }
 
     @GetMapping("/etudiant/{etudiantId}")
-    @PreAuthorize("isAuthenticated()")
+    @IsAuthenticated
     public ResponseEntity<ApiResponse<List<AlerteResponse>>> getAlertesByEtudiant(
             @PathVariable Long etudiantId) {
         List<Alerte> alertes = alerteService.getAlertesByEtudiant(etudiantId);

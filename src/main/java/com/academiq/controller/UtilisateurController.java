@@ -12,7 +12,9 @@ import com.academiq.entity.Utilisateur;
 import com.academiq.mapper.UtilisateurProfilMapper;
 import com.academiq.security.IsAdmin;
 import com.academiq.security.IsAdminOrResponsable;
+import com.academiq.security.IsSuperAdmin;
 import com.academiq.service.ImportService;
+import com.academiq.service.SecurityService;
 import com.academiq.service.UtilisateurService;
 import com.academiq.util.PaginationConstants;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -51,17 +53,29 @@ public class UtilisateurController {
     private final UtilisateurService utilisateurService;
     private final UtilisateurProfilMapper utilisateurProfilMapper;
     private final ImportService importService;
+    private final SecurityService securityService;
 
     @GetMapping
-    @IsAdminOrResponsable
+    @IsAdmin
     public ResponseEntity<ApiResponse<PageResponse<UtilisateurSummaryResponse>>> listerUtilisateurs(
+            @RequestParam(required = false) Role role,
             @RequestParam(defaultValue = PaginationConstants.DEFAULT_PAGE) int page,
             @RequestParam(defaultValue = PaginationConstants.DEFAULT_SIZE) int size,
             @RequestParam(defaultValue = PaginationConstants.DEFAULT_SORT_FIELD) String sortBy,
             @RequestParam(defaultValue = PaginationConstants.DEFAULT_SORT_DIRECTION) String direction) {
 
         Sort sort = direction.equalsIgnoreCase("asc") ? Sort.by(sortBy).ascending() : Sort.by(sortBy).descending();
-        Page<Utilisateur> utilisateurs = utilisateurService.findAll(PageRequest.of(page, size, sort));
+        Utilisateur current = securityService.getCurrentUser();
+
+        Page<Utilisateur> utilisateurs;
+        if (role != null) {
+            utilisateurs = utilisateurService.findByRole(role, PageRequest.of(page, size, sort));
+        } else if (current.getRole() == Role.ADMIN) {
+            utilisateurs = utilisateurService.findAllExcludingRole(Role.SUPER_ADMIN, PageRequest.of(page, size, sort));
+        } else {
+            utilisateurs = utilisateurService.findAll(PageRequest.of(page, size, sort));
+        }
+
         PageResponse<UtilisateurSummaryResponse> response = PageResponse.of(
                 utilisateurs,
                 utilisateurProfilMapper.toSummaryList(utilisateurs.getContent())
@@ -100,7 +114,7 @@ public class UtilisateurController {
     }
 
     @DeleteMapping("/{id}")
-    @IsAdmin
+    @IsSuperAdmin
     public ResponseEntity<ApiResponse<Void>> supprimerUtilisateur(@PathVariable Long id) {
         log.info("Suppression de l'utilisateur : {}", id);
         utilisateurService.deleteUtilisateur(id);
@@ -115,7 +129,7 @@ public class UtilisateurController {
     }
 
     @PatchMapping("/{id}/role")
-    @IsAdmin
+    @IsSuperAdmin
     public ResponseEntity<ApiResponse<Void>> changerRole(
             @PathVariable Long id,
             @RequestParam Role role) {
@@ -142,16 +156,18 @@ public class UtilisateurController {
     }
 
     @GetMapping("/stats")
-    @IsAdminOrResponsable
+    @IsAdmin
     public ResponseEntity<ApiResponse<Map<String, Object>>> getStatistiques() {
         Map<String, Object> stats = new HashMap<>();
         stats.put("totalUtilisateurs", utilisateurService.countByRole(Role.ETUDIANT)
                 + utilisateurService.countByRole(Role.ENSEIGNANT)
                 + utilisateurService.countByRole(Role.ADMIN)
-                + utilisateurService.countByRole(Role.RESPONSABLE_PEDAGOGIQUE));
+                + utilisateurService.countByRole(Role.RESPONSABLE_PEDAGOGIQUE)
+                + utilisateurService.countByRole(Role.SUPER_ADMIN));
         stats.put("etudiants", utilisateurService.countByRole(Role.ETUDIANT));
         stats.put("enseignants", utilisateurService.countByRole(Role.ENSEIGNANT));
         stats.put("admins", utilisateurService.countByRole(Role.ADMIN));
+        stats.put("superAdmins", utilisateurService.countByRole(Role.SUPER_ADMIN));
         stats.put("responsablesPedagogiques", utilisateurService.countByRole(Role.RESPONSABLE_PEDAGOGIQUE));
         stats.put("actifs", utilisateurService.countActifs());
         return ResponseEntity.ok(ApiResponse.success(stats));

@@ -30,6 +30,7 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final AuthenticationManager authenticationManager;
+    private final AuditLogService auditLogService;
 
     @Transactional
     public AuthResponse login(LoginRequest request) {
@@ -46,6 +47,8 @@ public class AuthService {
 
         utilisateur.setDernierLogin(LocalDateTime.now());
         utilisateurRepository.save(utilisateur);
+
+        auditLogService.logLogin(request.getEmail(), true);
 
         return buildAuthResponse(utilisateur);
     }

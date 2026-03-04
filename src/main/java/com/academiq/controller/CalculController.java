@@ -3,13 +3,13 @@ package com.academiq.controller;
 import com.academiq.dto.ApiResponse;
 import com.academiq.dto.calcul.BulletinEtudiantDTO;
 import com.academiq.security.IsAdminOrResponsable;
+import com.academiq.security.IsAuthenticated;
 import com.academiq.security.IsEnseignantOrAdmin;
 import com.academiq.service.BulletinService;
 import com.academiq.service.CalculService;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -27,7 +27,7 @@ public class CalculController {
     private final BulletinService bulletinService;
 
     @GetMapping("/bulletin/etudiant/{etudiantId}/promotion/{promotionId}")
-    @PreAuthorize("isAuthenticated()")
+    @IsAuthenticated
     public ResponseEntity<ApiResponse<BulletinEtudiantDTO>> getBulletin(
             @PathVariable Long etudiantId, @PathVariable Long promotionId) {
         return ResponseEntity.ok(ApiResponse.success(
@@ -71,7 +71,7 @@ public class CalculController {
     }
 
     @GetMapping("/credits/etudiant/{etudiantId}/niveau/{niveauId}/promotion/{promotionId}")
-    @PreAuthorize("isAuthenticated()")
+    @IsAuthenticated
     public ResponseEntity<ApiResponse<Map<String, Object>>> getCredits(
             @PathVariable Long etudiantId, @PathVariable Long niveauId, @PathVariable Long promotionId) {
         int creditsValides = calculService.calculerCreditsAnnuels(etudiantId, niveauId, promotionId);

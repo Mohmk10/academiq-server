@@ -5,11 +5,14 @@ import com.academiq.dto.utilisateur.UtilisateurUpdateRequest;
 import com.academiq.entity.Admin;
 import com.academiq.entity.Enseignant;
 import com.academiq.entity.Etudiant;
+import com.academiq.entity.NiveauAdmin;
 import com.academiq.entity.Role;
 import com.academiq.entity.StatutEnseignant;
 import com.academiq.entity.StatutEtudiant;
 import com.academiq.entity.Utilisateur;
+import com.academiq.exception.BusinessException;
 import com.academiq.exception.DuplicateResourceException;
+import com.academiq.exception.ForbiddenException;
 import com.academiq.exception.ResourceNotFoundException;
 import com.academiq.repository.AdminRepository;
 import com.academiq.repository.EnseignantRepository;
@@ -40,6 +43,8 @@ public class UtilisateurService {
     private final EnseignantRepository enseignantRepository;
     private final AdminRepository adminRepository;
     private final PasswordEncoder passwordEncoder;
+    private final SecurityService securityService;
+    private final AuditLogService auditLogService;
 
     public Utilisateur findById(Long id) {
         return utilisateurRepository.findById(id)
@@ -55,12 +60,20 @@ public class UtilisateurService {
         return utilisateurRepository.findAll(pageable);
     }
 
+    public Page<Utilisateur> findAllExcludingRole(Role role, Pageable pageable) {
+        return utilisateurRepository.findByRoleNot(role, pageable);
+    }
+
     public Page<Utilisateur> findByRole(Role role, Pageable pageable) {
         return utilisateurRepository.findByRole(role, pageable);
     }
 
     @Transactional
     public Utilisateur createUtilisateur(UtilisateurCreateRequest request) {
+        if (request.getRole() == Role.SUPER_ADMIN) {
+            throw new ForbiddenException("Le rôle SUPER_ADMIN ne peut pas être attribué via l'API");
+        }
+
         if (utilisateurRepository.existsByEmail(request.getEmail())) {
             throw new DuplicateResourceException("Utilisateur", "email", request.getEmail());
         }
@@ -92,7 +105,15 @@ public class UtilisateurService {
 
     @Transactional
     public Utilisateur updateUtilisateurComplet(Long id, UtilisateurUpdateRequest request) {
+        Utilisateur current = securityService.getCurrentUser();
         Utilisateur utilisateur = findById(id);
+
+        if (current.getRole() == Role.ADMIN &&
+                (utilisateur.getRole() == Role.SUPER_ADMIN || utilisateur.getRole() == Role.ADMIN)) {
+            if (!current.getId().equals(id)) {
+                throw new ForbiddenException("Un ADMIN ne peut pas modifier un SUPER_ADMIN ou un autre ADMIN");
+            }
+        }
 
         if (request.getNom() != null) {
             utilisateur.setNom(request.getNom());
@@ -118,7 +139,7 @@ public class UtilisateurService {
         switch (utilisateur.getRole()) {
             case ETUDIANT -> updateEtudiantProfil(utilisateur, request);
             case ENSEIGNANT -> updateEnseignantProfil(utilisateur, request);
-            case ADMIN -> updateAdminProfil(utilisateur, request);
+            case ADMIN, SUPER_ADMIN -> updateAdminProfil(utilisateur, request);
             default -> { }
         }
 
@@ -128,14 +149,25 @@ public class UtilisateurService {
 
     @Transactional
     public void deleteUtilisateur(Long id) {
+        Utilisateur current = securityService.getCurrentUser();
         Utilisateur utilisateur = findById(id);
+
+        if (current.getId().equals(id)) {
+            throw new BusinessException("Impossible de supprimer son propre compte");
+        }
+
+        if (utilisateur.getRole() == Role.SUPER_ADMIN) {
+            securityService.verifierMinimumSuperAdmin();
+        }
+
+        auditLogService.logAccountDeletion(current.getEmail(), utilisateur.getEmail());
 
         switch (utilisateur.getRole()) {
             case ETUDIANT -> etudiantRepository.findByUtilisateurId(id)
                     .ifPresent(etudiantRepository::delete);
             case ENSEIGNANT -> enseignantRepository.findByUtilisateurId(id)
                     .ifPresent(enseignantRepository::delete);
-            case ADMIN -> adminRepository.findByUtilisateurId(id)
+            case ADMIN, SUPER_ADMIN -> adminRepository.findByUtilisateurId(id)
                     .ifPresent(adminRepository::delete);
             default -> { }
         }
@@ -146,18 +178,49 @@ public class UtilisateurService {
 
     @Transactional
     public void toggleActivation(Long id) {
+        Utilisateur current = securityService.getCurrentUser();
         Utilisateur utilisateur = findById(id);
+
+        if (current.getRole() == Role.ADMIN && utilisateur.getRole() == Role.SUPER_ADMIN) {
+            throw new ForbiddenException("Un ADMIN ne peut pas modifier un SUPER_ADMIN");
+        }
+
+        if (utilisateur.getRole() == Role.SUPER_ADMIN && utilisateur.isActif()) {
+            securityService.verifierMinimumSuperAdmin();
+        }
+
         utilisateur.setActif(!utilisateur.isActif());
         utilisateurRepository.save(utilisateur);
+
+        auditLogService.logAccountToggle(current.getEmail(), utilisateur.getEmail(), utilisateur.isActif());
         log.info("Utilisateur {} {}", id, utilisateur.isActif() ? "activé" : "désactivé");
     }
 
     @Transactional
-    public void changeRole(Long id, Role newRole) {
-        Utilisateur utilisateur = findById(id);
-        utilisateur.setRole(newRole);
-        utilisateurRepository.save(utilisateur);
-        log.info("Rôle de l'utilisateur {} changé en {}", id, newRole);
+    public void changeRole(Long id, Role nouveauRole) {
+        Utilisateur current = securityService.getCurrentUser();
+        Utilisateur target = findById(id);
+
+        if (current.getId().equals(id)) {
+            throw new BusinessException("Impossible de modifier son propre rôle");
+        }
+
+        if (target.getRole() == Role.SUPER_ADMIN && nouveauRole != Role.SUPER_ADMIN) {
+            securityService.verifierMinimumSuperAdmin();
+        }
+
+        Role ancienRole = target.getRole();
+        target.setRole(nouveauRole);
+
+        gererChangementProfil(target, ancienRole, nouveauRole);
+
+        utilisateurRepository.save(target);
+
+        auditLogService.logRoleChange(
+                current.getEmail(), target.getEmail(),
+                ancienRole.name(), nouveauRole.name()
+        );
+        log.info("Rôle de l'utilisateur {} changé de {} en {}", id, ancienRole, nouveauRole);
     }
 
     public long countByRole(Role role) {
@@ -170,6 +233,61 @@ public class UtilisateurService {
 
     public Page<Utilisateur> rechercher(String keyword, Pageable pageable) {
         return utilisateurRepository.rechercher(keyword, pageable);
+    }
+
+    private void gererChangementProfil(Utilisateur utilisateur, Role ancienRole, Role nouveauRole) {
+        if (ancienRole == nouveauRole) return;
+
+        // Supprimer l'ancien profil
+        switch (ancienRole) {
+            case ETUDIANT -> etudiantRepository.findByUtilisateurId(utilisateur.getId())
+                    .ifPresent(etudiantRepository::delete);
+            case ENSEIGNANT -> enseignantRepository.findByUtilisateurId(utilisateur.getId())
+                    .ifPresent(enseignantRepository::delete);
+            case ADMIN, SUPER_ADMIN -> adminRepository.findByUtilisateurId(utilisateur.getId())
+                    .ifPresent(adminRepository::delete);
+            default -> { }
+        }
+
+        // Créer le nouveau profil
+        switch (nouveauRole) {
+            case ETUDIANT -> {
+                Etudiant etudiant = Etudiant.builder()
+                        .utilisateur(utilisateur)
+                        .matricule(generateMatricule("ETU"))
+                        .dateInscription(LocalDate.now())
+                        .statut(StatutEtudiant.ACTIF)
+                        .build();
+                etudiantRepository.save(etudiant);
+            }
+            case ENSEIGNANT -> {
+                Enseignant enseignant = Enseignant.builder()
+                        .utilisateur(utilisateur)
+                        .matricule(generateMatricule("ENS"))
+                        .specialite("Non définie")
+                        .dateRecrutement(LocalDate.now())
+                        .statut(StatutEnseignant.ACTIF)
+                        .build();
+                enseignantRepository.save(enseignant);
+            }
+            case ADMIN -> {
+                Admin admin = Admin.builder()
+                        .utilisateur(utilisateur)
+                        .fonction("Administrateur")
+                        .niveau(NiveauAdmin.ADMIN)
+                        .build();
+                adminRepository.save(admin);
+            }
+            case SUPER_ADMIN -> {
+                Admin admin = Admin.builder()
+                        .utilisateur(utilisateur)
+                        .fonction("Super Administrateur")
+                        .niveau(NiveauAdmin.SUPER_ADMIN)
+                        .build();
+                adminRepository.save(admin);
+            }
+            default -> { }
+        }
     }
 
     private void createEtudiantProfil(Utilisateur utilisateur, UtilisateurCreateRequest request) {

@@ -15,13 +15,13 @@ import com.academiq.entity.Utilisateur;
 import com.academiq.repository.EtudiantRepository;
 import com.academiq.security.IsAdmin;
 import com.academiq.security.IsAdminOrResponsable;
+import com.academiq.security.IsAuthenticated;
 import com.academiq.security.IsEnseignantOrAdmin;
 import com.academiq.service.StatsService;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -56,7 +56,7 @@ public class AnalyticsController {
     }
 
     @GetMapping("/dashboard/etudiant/{etudiantId}")
-    @PreAuthorize("isAuthenticated()")
+    @IsAuthenticated
     public ResponseEntity<ApiResponse<DashboardEtudiantDTO>> getDashboardEtudiant(
             @PathVariable Long etudiantId,
             @AuthenticationPrincipal Utilisateur utilisateur) {
@@ -111,7 +111,7 @@ public class AnalyticsController {
     // ======================== Évolution ========================
 
     @GetMapping("/evolution/etudiant/{etudiantId}")
-    @PreAuthorize("isAuthenticated()")
+    @IsAuthenticated
     public ResponseEntity<ApiResponse<EvolutionPerformanceDTO>> getEvolutionEtudiant(
             @PathVariable Long etudiantId,
             @AuthenticationPrincipal Utilisateur utilisateur) {
@@ -141,7 +141,8 @@ public class AnalyticsController {
     // ======================== Utilitaire ========================
 
     private void verifierAccesEtudiant(Long etudiantId, Utilisateur utilisateur) {
-        if (utilisateur.getRole() == Role.ADMIN
+        if (utilisateur.getRole() == Role.SUPER_ADMIN
+                || utilisateur.getRole() == Role.ADMIN
                 || utilisateur.getRole() == Role.RESPONSABLE_PEDAGOGIQUE
                 || utilisateur.getRole() == Role.ENSEIGNANT) {
             return;
