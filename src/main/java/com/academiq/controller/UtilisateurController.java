@@ -89,7 +89,16 @@ public class UtilisateurController {
     @GetMapping("/{id}")
     @IsAdminOrResponsable
     public ResponseEntity<ApiResponse<UtilisateurDetailResponse>> getUtilisateur(@PathVariable Long id) {
+        Utilisateur current = securityService.getCurrentUser();
         Utilisateur utilisateur = utilisateurService.findById(id);
+
+        if (current.getRole() == Role.ADMIN && utilisateur.getRole() == Role.SUPER_ADMIN) {
+            throw new com.academiq.exception.ForbiddenException("Un ADMIN ne peut pas consulter un profil SUPER_ADMIN");
+        }
+        if (current.getRole() == Role.RESPONSABLE_PEDAGOGIQUE && utilisateur.getRole() != Role.ETUDIANT) {
+            throw new com.academiq.exception.ForbiddenException("Un responsable pédagogique ne peut consulter que les profils étudiants");
+        }
+
         UtilisateurDetailResponse response = utilisateurProfilMapper.toDetailResponse(utilisateur);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
@@ -150,10 +159,20 @@ public class UtilisateurController {
             @RequestParam(defaultValue = PaginationConstants.DEFAULT_SORT_DIRECTION) String direction) {
 
         Sort sort = direction.equalsIgnoreCase("asc") ? Sort.by(sortBy).ascending() : Sort.by(sortBy).descending();
+        Utilisateur current = securityService.getCurrentUser();
         Page<Utilisateur> utilisateurs = utilisateurService.rechercher(keyword, PageRequest.of(page, size, sort));
+
+        java.util.List<Utilisateur> filtered = utilisateurs.getContent().stream()
+                .filter(u -> {
+                    if (current.getRole() == Role.ADMIN && u.getRole() == Role.SUPER_ADMIN) return false;
+                    if (current.getRole() == Role.RESPONSABLE_PEDAGOGIQUE && u.getRole() != Role.ETUDIANT) return false;
+                    return true;
+                })
+                .toList();
+
         PageResponse<UtilisateurSummaryResponse> response = PageResponse.of(
                 utilisateurs,
-                utilisateurProfilMapper.toSummaryList(utilisateurs.getContent())
+                utilisateurProfilMapper.toSummaryList(filtered)
         );
         return ResponseEntity.ok(ApiResponse.success(response));
     }
@@ -161,18 +180,28 @@ public class UtilisateurController {
     @GetMapping("/stats")
     @IsAdmin
     public ResponseEntity<ApiResponse<Map<String, Object>>> getStatistiques() {
+        Utilisateur current = securityService.getCurrentUser();
         Map<String, Object> stats = new HashMap<>();
-        stats.put("totalUtilisateurs", utilisateurService.countByRole(Role.ETUDIANT)
-                + utilisateurService.countByRole(Role.ENSEIGNANT)
-                + utilisateurService.countByRole(Role.ADMIN)
-                + utilisateurService.countByRole(Role.RESPONSABLE_PEDAGOGIQUE)
-                + utilisateurService.countByRole(Role.SUPER_ADMIN));
-        stats.put("etudiants", utilisateurService.countByRole(Role.ETUDIANT));
-        stats.put("enseignants", utilisateurService.countByRole(Role.ENSEIGNANT));
-        stats.put("admins", utilisateurService.countByRole(Role.ADMIN));
-        stats.put("superAdmins", utilisateurService.countByRole(Role.SUPER_ADMIN));
-        stats.put("responsablesPedagogiques", utilisateurService.countByRole(Role.RESPONSABLE_PEDAGOGIQUE));
+
+        long etudiants = utilisateurService.countByRole(Role.ETUDIANT);
+        long enseignants = utilisateurService.countByRole(Role.ENSEIGNANT);
+        long admins = utilisateurService.countByRole(Role.ADMIN);
+        long rp = utilisateurService.countByRole(Role.RESPONSABLE_PEDAGOGIQUE);
+
+        stats.put("etudiants", etudiants);
+        stats.put("enseignants", enseignants);
+        stats.put("admins", admins);
+        stats.put("responsablesPedagogiques", rp);
         stats.put("actifs", utilisateurService.countActifs());
+
+        if (current.getRole() == Role.SUPER_ADMIN) {
+            long superAdmins = utilisateurService.countByRole(Role.SUPER_ADMIN);
+            stats.put("superAdmins", superAdmins);
+            stats.put("totalUtilisateurs", etudiants + enseignants + admins + rp + superAdmins);
+        } else {
+            stats.put("totalUtilisateurs", etudiants + enseignants + admins + rp);
+        }
+
         return ResponseEntity.ok(ApiResponse.success(stats));
     }
 

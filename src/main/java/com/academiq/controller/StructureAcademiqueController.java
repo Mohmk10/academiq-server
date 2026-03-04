@@ -21,8 +21,9 @@ import com.academiq.entity.Semestre;
 import com.academiq.entity.UniteEnseignement;
 import com.academiq.mapper.StructureMapper;
 import com.academiq.security.IsAdmin;
-import com.academiq.security.IsAdminOrResponsable;
+import com.academiq.security.IsAllExceptEtudiant;
 import com.academiq.security.IsEnseignantOrAdmin;
+import com.academiq.service.SecurityService;
 import com.academiq.service.StructureAcademiqueService;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -48,6 +49,7 @@ public class StructureAcademiqueController {
 
     private final StructureAcademiqueService structureService;
     private final StructureMapper structureMapper;
+    private final SecurityService securityService;
 
     // ======================== Filières ========================
 
@@ -60,14 +62,14 @@ public class StructureAcademiqueController {
     }
 
     @GetMapping("/filieres")
-    @IsAdminOrResponsable
+    @IsAllExceptEtudiant
     public ResponseEntity<ApiResponse<List<FiliereResponse>>> listerFilieres() {
         List<FiliereResponse> filieres = structureMapper.toFiliereResponseList(structureService.getAllFilieres());
         return ResponseEntity.ok(ApiResponse.success(filieres));
     }
 
     @GetMapping("/filieres/{id}")
-    @IsAdminOrResponsable
+    @IsAllExceptEtudiant
     public ResponseEntity<ApiResponse<FiliereResponse>> getFiliere(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success(structureMapper.toFiliereResponse(structureService.getFiliereById(id))));
     }
@@ -98,14 +100,14 @@ public class StructureAcademiqueController {
     }
 
     @GetMapping("/filieres/{filiereId}/niveaux")
-    @IsAdminOrResponsable
+    @IsAllExceptEtudiant
     public ResponseEntity<ApiResponse<List<NiveauResponse>>> listerNiveaux(@PathVariable Long filiereId) {
         List<NiveauResponse> niveaux = structureMapper.toNiveauResponseList(structureService.getNiveauxByFiliere(filiereId));
         return ResponseEntity.ok(ApiResponse.success(niveaux));
     }
 
     @GetMapping("/niveaux/{id}")
-    @IsAdminOrResponsable
+    @IsAllExceptEtudiant
     public ResponseEntity<ApiResponse<NiveauResponse>> getNiveau(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success(structureMapper.toNiveauResponse(structureService.getNiveauById(id))));
     }
@@ -121,21 +123,21 @@ public class StructureAcademiqueController {
     }
 
     @GetMapping("/niveaux/{niveauId}/promotions")
-    @IsAdminOrResponsable
+    @IsAllExceptEtudiant
     public ResponseEntity<ApiResponse<List<PromotionResponse>>> listerPromotions(@PathVariable Long niveauId) {
         List<PromotionResponse> promotions = structureMapper.toPromotionResponseList(structureService.getPromotionsByNiveau(niveauId));
         return ResponseEntity.ok(ApiResponse.success(promotions));
     }
 
     @GetMapping("/promotions")
-    @IsAdminOrResponsable
+    @IsAllExceptEtudiant
     public ResponseEntity<ApiResponse<List<PromotionResponse>>> listerPromotionsActives() {
         List<PromotionResponse> promotions = structureMapper.toPromotionResponseList(structureService.getPromotionsActives());
         return ResponseEntity.ok(ApiResponse.success(promotions));
     }
 
     @GetMapping("/promotions/{id}")
-    @IsAdminOrResponsable
+    @IsAllExceptEtudiant
     public ResponseEntity<ApiResponse<PromotionResponse>> getPromotion(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success(structureMapper.toPromotionResponse(structureService.getPromotionById(id))));
     }
@@ -159,7 +161,7 @@ public class StructureAcademiqueController {
     }
 
     @GetMapping("/niveaux/{niveauId}/semestres")
-    @IsAdminOrResponsable
+    @IsAllExceptEtudiant
     public ResponseEntity<ApiResponse<List<SemestreResponse>>> listerSemestres(@PathVariable Long niveauId) {
         List<SemestreResponse> semestres = structureMapper.toSemestreResponseList(structureService.getSemestresByNiveau(niveauId));
         return ResponseEntity.ok(ApiResponse.success(semestres));
@@ -176,14 +178,14 @@ public class StructureAcademiqueController {
     }
 
     @GetMapping("/semestres/{semestreId}/ues")
-    @IsAdminOrResponsable
+    @IsAllExceptEtudiant
     public ResponseEntity<ApiResponse<List<UeResponse>>> listerUes(@PathVariable Long semestreId) {
         List<UeResponse> ues = structureMapper.toUeResponseList(structureService.getUesBySemestre(semestreId));
         return ResponseEntity.ok(ApiResponse.success(ues));
     }
 
     @GetMapping("/ues/{id}")
-    @IsAdminOrResponsable
+    @IsAllExceptEtudiant
     public ResponseEntity<ApiResponse<UeResponse>> getUe(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success(structureMapper.toUeResponse(structureService.getUeById(id))));
     }
@@ -214,14 +216,14 @@ public class StructureAcademiqueController {
     }
 
     @GetMapping("/ues/{ueId}/modules")
-    @IsAdminOrResponsable
+    @IsAllExceptEtudiant
     public ResponseEntity<ApiResponse<List<ModuleResponse>>> listerModules(@PathVariable Long ueId) {
         List<ModuleResponse> modules = structureMapper.toModuleResponseList(structureService.getModulesByUe(ueId));
         return ResponseEntity.ok(ApiResponse.success(modules));
     }
 
     @GetMapping("/modules/{id}")
-    @IsAdminOrResponsable
+    @IsAllExceptEtudiant
     public ResponseEntity<ApiResponse<ModuleResponse>> getModule(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success(structureMapper.toModuleResponse(structureService.getModuleById(id))));
     }
@@ -229,6 +231,7 @@ public class StructureAcademiqueController {
     @GetMapping("/modules/enseignant/{enseignantId}")
     @IsEnseignantOrAdmin
     public ResponseEntity<ApiResponse<List<ModuleResponse>>> getModulesParEnseignant(@PathVariable Long enseignantId) {
+        securityService.verifierAccesEnseignant(enseignantId);
         List<ModuleResponse> modules = structureMapper.toModuleResponseList(structureService.getModulesByEnseignant(enseignantId));
         return ResponseEntity.ok(ApiResponse.success(modules));
     }
