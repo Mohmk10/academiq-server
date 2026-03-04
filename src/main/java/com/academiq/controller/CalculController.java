@@ -3,10 +3,11 @@ package com.academiq.controller;
 import com.academiq.dto.ApiResponse;
 import com.academiq.dto.calcul.BulletinEtudiantDTO;
 import com.academiq.security.IsAdminOrResponsable;
+import com.academiq.security.IsAllExceptEtudiant;
 import com.academiq.security.IsAuthenticated;
-import com.academiq.security.IsEnseignantOrAdmin;
 import com.academiq.service.BulletinService;
 import com.academiq.service.CalculService;
+import com.academiq.service.SecurityService;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -25,26 +26,29 @@ public class CalculController {
 
     private final CalculService calculService;
     private final BulletinService bulletinService;
+    private final SecurityService securityService;
 
     @GetMapping("/bulletin/etudiant/{etudiantId}/promotion/{promotionId}")
     @IsAuthenticated
     public ResponseEntity<ApiResponse<BulletinEtudiantDTO>> getBulletin(
             @PathVariable Long etudiantId, @PathVariable Long promotionId) {
+        securityService.verifierAccesEtudiant(etudiantId);
         return ResponseEntity.ok(ApiResponse.success(
                 bulletinService.genererBulletin(etudiantId, promotionId)));
     }
 
     @GetMapping("/moyenne-module/etudiant/{etudiantId}/module/{moduleId}/promotion/{promotionId}")
-    @IsEnseignantOrAdmin
+    @IsAllExceptEtudiant
     public ResponseEntity<ApiResponse<Map<String, Object>>> getMoyenneModule(
             @PathVariable Long etudiantId, @PathVariable Long moduleId, @PathVariable Long promotionId) {
+        securityService.verifierAccesModule(moduleId);
         Double moyenne = calculService.calculerMoyenneModule(etudiantId, moduleId, promotionId);
         return ResponseEntity.ok(ApiResponse.success(
                 Map.of("etudiantId", etudiantId, "moduleId", moduleId, "moyenne", moyenne != null ? moyenne : "N/A")));
     }
 
     @GetMapping("/moyenne-ue/etudiant/{etudiantId}/ue/{ueId}/promotion/{promotionId}")
-    @IsEnseignantOrAdmin
+    @IsAdminOrResponsable
     public ResponseEntity<ApiResponse<Map<String, Object>>> getMoyenneUE(
             @PathVariable Long etudiantId, @PathVariable Long ueId, @PathVariable Long promotionId) {
         Double moyenne = calculService.calculerMoyenneUE(etudiantId, ueId, promotionId);
@@ -53,7 +57,7 @@ public class CalculController {
     }
 
     @GetMapping("/moyenne-semestre/etudiant/{etudiantId}/semestre/{semestreId}/promotion/{promotionId}")
-    @IsEnseignantOrAdmin
+    @IsAdminOrResponsable
     public ResponseEntity<ApiResponse<Map<String, Object>>> getMoyenneSemestre(
             @PathVariable Long etudiantId, @PathVariable Long semestreId, @PathVariable Long promotionId) {
         Double moyenne = calculService.calculerMoyenneSemestre(etudiantId, semestreId, promotionId);
@@ -62,7 +66,7 @@ public class CalculController {
     }
 
     @GetMapping("/moyenne-annuelle/etudiant/{etudiantId}/niveau/{niveauId}/promotion/{promotionId}")
-    @IsEnseignantOrAdmin
+    @IsAdminOrResponsable
     public ResponseEntity<ApiResponse<Map<String, Object>>> getMoyenneAnnuelle(
             @PathVariable Long etudiantId, @PathVariable Long niveauId, @PathVariable Long promotionId) {
         Double moyenne = calculService.calculerMoyenneAnnuelle(etudiantId, niveauId, promotionId);
@@ -74,6 +78,7 @@ public class CalculController {
     @IsAuthenticated
     public ResponseEntity<ApiResponse<Map<String, Object>>> getCredits(
             @PathVariable Long etudiantId, @PathVariable Long niveauId, @PathVariable Long promotionId) {
+        securityService.verifierAccesEtudiant(etudiantId);
         int creditsValides = calculService.calculerCreditsAnnuels(etudiantId, niveauId, promotionId);
         int creditsRequis = calculService.calculerCreditsTotauxRequis(niveauId);
         return ResponseEntity.ok(ApiResponse.success(

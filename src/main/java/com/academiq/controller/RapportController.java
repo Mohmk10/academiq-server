@@ -2,15 +2,14 @@ package com.academiq.controller;
 
 import com.academiq.entity.Etudiant;
 import com.academiq.entity.Promotion;
-import com.academiq.entity.Role;
-import com.academiq.entity.Utilisateur;
 import com.academiq.exception.ResourceNotFoundException;
 import com.academiq.repository.EtudiantRepository;
 import com.academiq.repository.ModuleFormationRepository;
 import com.academiq.repository.PromotionRepository;
 import com.academiq.security.IsAdminOrResponsable;
-import com.academiq.security.IsEnseignantOrAdmin;
+import com.academiq.security.IsAllExceptEtudiant;
 import com.academiq.service.ExportExcelService;
+import com.academiq.service.SecurityService;
 import com.academiq.service.pdf.PdfService;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -19,8 +18,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import com.academiq.security.IsAuthenticated;
-import org.springframework.security.access.AccessDeniedException;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -37,15 +34,15 @@ public class RapportController {
     private final EtudiantRepository etudiantRepository;
     private final PromotionRepository promotionRepository;
     private final ModuleFormationRepository moduleFormationRepository;
+    private final SecurityService securityService;
 
     @GetMapping("/releve/etudiant/{etudiantId}/promotion/{promotionId}")
     @IsAuthenticated
     public ResponseEntity<byte[]> telechargerReleve(
             @PathVariable Long etudiantId,
-            @PathVariable Long promotionId,
-            @AuthenticationPrincipal Utilisateur utilisateur) {
+            @PathVariable Long promotionId) {
 
-        verifierAccesEtudiant(etudiantId, utilisateur);
+        securityService.verifierAccesEtudiant(etudiantId);
 
         Etudiant etudiant = etudiantRepository.findById(etudiantId)
                 .orElseThrow(() -> new ResourceNotFoundException("Étudiant", "id", etudiantId));
@@ -106,11 +103,12 @@ public class RapportController {
     }
 
     @GetMapping("/export-excel/module/{moduleId}/promotion/{promotionId}")
-    @IsEnseignantOrAdmin
+    @IsAllExceptEtudiant
     public ResponseEntity<byte[]> exporterExcelModule(
             @PathVariable Long moduleId,
             @PathVariable Long promotionId) {
 
+        securityService.verifierAccesModule(moduleId);
         var module = moduleFormationRepository.findById(moduleId)
                 .orElseThrow(() -> new ResourceNotFoundException("Module", "id", moduleId));
         Promotion promotion = promotionRepository.findById(promotionId)
@@ -122,21 +120,6 @@ public class RapportController {
                 promotion.getAnneeUniversitaire());
 
         return buildExcelResponse(excel, filename);
-    }
-
-    private void verifierAccesEtudiant(Long etudiantId, Utilisateur utilisateur) {
-        if (utilisateur.getRole() == Role.SUPER_ADMIN
-                || utilisateur.getRole() == Role.ADMIN
-                || utilisateur.getRole() == Role.RESPONSABLE_PEDAGOGIQUE) {
-            return;
-        }
-
-        Etudiant etudiant = etudiantRepository.findByUtilisateurId(utilisateur.getId())
-                .orElse(null);
-
-        if (etudiant == null || !etudiant.getId().equals(etudiantId)) {
-            throw new AccessDeniedException("Vous n'avez pas accès à ce relevé");
-        }
     }
 
     private ResponseEntity<byte[]> buildPdfResponse(byte[] pdf, String filename) {

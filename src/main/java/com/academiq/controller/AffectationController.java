@@ -9,6 +9,7 @@ import com.academiq.security.IsAdmin;
 import com.academiq.security.IsAdminOrResponsable;
 import com.academiq.security.IsEnseignantOrAdmin;
 import com.academiq.service.AffectationService;
+import com.academiq.service.SecurityService;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -32,6 +33,7 @@ public class AffectationController {
 
     private final AffectationService affectationService;
     private final StructureMapper structureMapper;
+    private final SecurityService securityService;
 
     @PostMapping
     @IsAdmin
@@ -46,6 +48,7 @@ public class AffectationController {
     @GetMapping("/enseignant/{enseignantId}")
     @IsEnseignantOrAdmin
     public ResponseEntity<ApiResponse<List<AffectationResponse>>> getAffectationsEnseignant(@PathVariable Long enseignantId) {
+        securityService.verifierAccesEnseignant(enseignantId);
         List<AffectationResponse> affectations = structureMapper.toAffectationResponseList(
                 affectationService.getAffectationsByEnseignant(enseignantId));
         return ResponseEntity.ok(ApiResponse.success(affectations));
