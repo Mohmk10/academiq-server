@@ -7,6 +7,10 @@ spring:
 server:
   servlet:
     context-path: /api
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
 
 logging:
   level:

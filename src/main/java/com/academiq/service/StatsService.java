@@ -421,9 +421,14 @@ public class StatsService {
 
         Map<String, Long> inscriptionsParFiliere = new LinkedHashMap<>();
         for (Promotion promo : promotionsActives) {
-            String filiereNom = promo.getNiveau().getFiliere().getNom();
-            long nbInscrits = inscriptionRepository.countByPromotionId(promo.getId());
-            inscriptionsParFiliere.merge(filiereNom, nbInscrits, Long::sum);
+            try {
+                String filiereNom = promo.getNiveau() != null && promo.getNiveau().getFiliere() != null
+                        ? promo.getNiveau().getFiliere().getNom() : "Non classée";
+                long nbInscrits = inscriptionRepository.countByPromotionId(promo.getId());
+                inscriptionsParFiliere.merge(filiereNom, nbInscrits, Long::sum);
+            } catch (Exception e) {
+                log.warn("Erreur inscriptions filière pour promotion {}", promo.getId(), e);
+            }
         }
 
         return DashboardAdminDTO.builder()
@@ -501,8 +506,8 @@ public class StatsService {
                 .promotionId(promotionId)
                 .promotionNom(promotion.getNom())
                 .anneeUniversitaire(promotion.getAnneeUniversitaire())
-                .filiereNom(niveau.getFiliere().getNom())
-                .niveauNom(niveau.getNiveau().name())
+                .filiereNom(niveau != null && niveau.getFiliere() != null ? niveau.getFiliere().getNom() : "N/A")
+                .niveauNom(niveau != null && niveau.getNiveau() != null ? niveau.getNiveau().name() : "N/A")
                 .nombreInscrits(total)
                 .moyenneGenerale(calculerMoyenneListe(moyennes))
                 .tauxReussite(taux)
