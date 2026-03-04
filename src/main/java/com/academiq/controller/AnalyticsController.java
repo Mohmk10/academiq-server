@@ -9,20 +9,15 @@ import com.academiq.dto.stats.DistributionNotesDTO;
 import com.academiq.dto.stats.EvolutionModuleDTO;
 import com.academiq.dto.stats.EvolutionPerformanceDTO;
 import com.academiq.dto.stats.TauxReussiteDTO;
-import com.academiq.entity.Etudiant;
-import com.academiq.entity.Role;
-import com.academiq.entity.Utilisateur;
-import com.academiq.repository.EtudiantRepository;
-import com.academiq.security.IsAdmin;
 import com.academiq.security.IsAdminOrResponsable;
+import com.academiq.security.IsAllExceptEtudiant;
 import com.academiq.security.IsAuthenticated;
 import com.academiq.security.IsEnseignantOrAdmin;
+import com.academiq.service.SecurityService;
 import com.academiq.service.StatsService;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.AccessDeniedException;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -38,12 +33,12 @@ import java.util.List;
 public class AnalyticsController {
 
     private final StatsService statsService;
-    private final EtudiantRepository etudiantRepository;
+    private final SecurityService securityService;
 
     // ======================== Dashboards ========================
 
     @GetMapping("/dashboard/admin")
-    @IsAdmin
+    @IsAdminOrResponsable
     public ResponseEntity<ApiResponse<DashboardAdminDTO>> getDashboardAdmin() {
         return ResponseEntity.ok(ApiResponse.success(statsService.getDashboardAdmin()));
     }
@@ -52,24 +47,25 @@ public class AnalyticsController {
     @IsEnseignantOrAdmin
     public ResponseEntity<ApiResponse<DashboardEnseignantDTO>> getDashboardEnseignant(
             @PathVariable Long enseignantId) {
+        securityService.verifierAccesEnseignant(enseignantId);
         return ResponseEntity.ok(ApiResponse.success(statsService.getDashboardEnseignant(enseignantId)));
     }
 
     @GetMapping("/dashboard/etudiant/{etudiantId}")
     @IsAuthenticated
     public ResponseEntity<ApiResponse<DashboardEtudiantDTO>> getDashboardEtudiant(
-            @PathVariable Long etudiantId,
-            @AuthenticationPrincipal Utilisateur utilisateur) {
-        verifierAccesEtudiant(etudiantId, utilisateur);
+            @PathVariable Long etudiantId) {
+        securityService.verifierAccesEtudiant(etudiantId);
         return ResponseEntity.ok(ApiResponse.success(statsService.getDashboardEtudiant(etudiantId)));
     }
 
     // ======================== Taux de réussite ========================
 
     @GetMapping("/taux-reussite/module/{moduleId}/promotion/{promotionId}")
-    @IsEnseignantOrAdmin
+    @IsAllExceptEtudiant
     public ResponseEntity<ApiResponse<TauxReussiteDTO>> getTauxReussiteModule(
             @PathVariable Long moduleId, @PathVariable Long promotionId) {
+        securityService.verifierAccesModule(moduleId);
         return ResponseEntity.ok(ApiResponse.success(
                 statsService.calculerTauxReussiteModule(moduleId, promotionId)));
     }
@@ -93,17 +89,19 @@ public class AnalyticsController {
     // ======================== Distribution ========================
 
     @GetMapping("/distribution/module/{moduleId}/promotion/{promotionId}")
-    @IsEnseignantOrAdmin
+    @IsAllExceptEtudiant
     public ResponseEntity<ApiResponse<DistributionNotesDTO>> getDistributionModule(
             @PathVariable Long moduleId, @PathVariable Long promotionId) {
+        securityService.verifierAccesModule(moduleId);
         return ResponseEntity.ok(ApiResponse.success(
                 statsService.calculerDistributionModule(moduleId, promotionId)));
     }
 
     @GetMapping("/distribution/evaluation/{evaluationId}")
-    @IsEnseignantOrAdmin
+    @IsAllExceptEtudiant
     public ResponseEntity<ApiResponse<DistributionNotesDTO>> getDistributionEvaluation(
             @PathVariable Long evaluationId) {
+        securityService.verifierAccesEvaluation(evaluationId);
         return ResponseEntity.ok(ApiResponse.success(
                 statsService.calculerDistributionEvaluation(evaluationId)));
     }
@@ -113,17 +111,17 @@ public class AnalyticsController {
     @GetMapping("/evolution/etudiant/{etudiantId}")
     @IsAuthenticated
     public ResponseEntity<ApiResponse<EvolutionPerformanceDTO>> getEvolutionEtudiant(
-            @PathVariable Long etudiantId,
-            @AuthenticationPrincipal Utilisateur utilisateur) {
-        verifierAccesEtudiant(etudiantId, utilisateur);
+            @PathVariable Long etudiantId) {
+        securityService.verifierAccesEtudiant(etudiantId);
         return ResponseEntity.ok(ApiResponse.success(
                 statsService.calculerEvolutionEtudiant(etudiantId)));
     }
 
     @GetMapping("/evolution/module/{moduleId}")
-    @IsEnseignantOrAdmin
+    @IsAllExceptEtudiant
     public ResponseEntity<ApiResponse<EvolutionModuleDTO>> getEvolutionModule(
             @PathVariable Long moduleId) {
+        securityService.verifierAccesModule(moduleId);
         return ResponseEntity.ok(ApiResponse.success(
                 statsService.calculerEvolutionModule(moduleId)));
     }
@@ -136,23 +134,5 @@ public class AnalyticsController {
             @RequestParam List<Long> promotionIds) {
         return ResponseEntity.ok(ApiResponse.success(
                 statsService.comparerPromotions(promotionIds)));
-    }
-
-    // ======================== Utilitaire ========================
-
-    private void verifierAccesEtudiant(Long etudiantId, Utilisateur utilisateur) {
-        if (utilisateur.getRole() == Role.SUPER_ADMIN
-                || utilisateur.getRole() == Role.ADMIN
-                || utilisateur.getRole() == Role.RESPONSABLE_PEDAGOGIQUE
-                || utilisateur.getRole() == Role.ENSEIGNANT) {
-            return;
-        }
-
-        Etudiant etudiant = etudiantRepository.findByUtilisateurId(utilisateur.getId())
-                .orElse(null);
-
-        if (etudiant == null || !etudiant.getId().equals(etudiantId)) {
-            throw new AccessDeniedException("Accès non autorisé à ces données");
-        }
     }
 }
