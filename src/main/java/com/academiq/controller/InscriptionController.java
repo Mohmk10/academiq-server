@@ -41,6 +41,14 @@ public class InscriptionController {
                 .body(ApiResponse.success("Inscription réussie", structureMapper.toInscriptionResponse(inscription)));
     }
 
+    @GetMapping
+    @IsAdminOrResponsable
+    public ResponseEntity<ApiResponse<List<InscriptionResponse>>> getAllInscriptions() {
+        List<InscriptionResponse> inscriptions = structureMapper.toInscriptionResponseList(
+                inscriptionService.getAllInscriptions());
+        return ResponseEntity.ok(ApiResponse.success(inscriptions));
+    }
+
     @GetMapping("/etudiant/{etudiantId}")
     @IsAdminOrResponsable
     public ResponseEntity<ApiResponse<List<InscriptionResponse>>> getInscriptionsEtudiant(@PathVariable Long etudiantId) {

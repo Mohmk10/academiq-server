@@ -63,6 +63,10 @@ public class NoteService {
 
     // ======================== Évaluations ========================
 
+    public List<Evaluation> getAllEvaluations() {
+        return evaluationRepository.findAll();
+    }
+
     public List<Evaluation> getEvaluationsByModule(Long moduleId) {
         return evaluationRepository.findByModuleFormationId(moduleId);
     }

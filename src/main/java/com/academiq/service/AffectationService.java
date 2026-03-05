@@ -30,6 +30,10 @@ public class AffectationService {
     private final ModuleFormationRepository moduleFormationRepository;
     private final PromotionRepository promotionRepository;
 
+    public List<Affectation> getAllAffectations() {
+        return affectationRepository.findAll();
+    }
+
     public List<Affectation> getAffectationsByEnseignant(Long enseignantId) {
         return affectationRepository.findByEnseignantId(enseignantId);
     }

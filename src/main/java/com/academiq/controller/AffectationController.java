@@ -45,6 +45,14 @@ public class AffectationController {
                 .body(ApiResponse.success("Affectation réussie", structureMapper.toAffectationResponse(affectation)));
     }
 
+    @GetMapping
+    @IsAdminOrResponsable
+    public ResponseEntity<ApiResponse<List<AffectationResponse>>> getAllAffectations() {
+        List<AffectationResponse> affectations = structureMapper.toAffectationResponseList(
+                affectationService.getAllAffectations());
+        return ResponseEntity.ok(ApiResponse.success(affectations));
+    }
+
     @GetMapping("/enseignant/{enseignantId}")
     @IsEnseignantOrAdmin
     public ResponseEntity<ApiResponse<List<AffectationResponse>>> getAffectationsEnseignant(@PathVariable Long enseignantId) {

@@ -30,6 +30,10 @@ public class InscriptionService {
     private final EtudiantRepository etudiantRepository;
     private final PromotionRepository promotionRepository;
 
+    public List<Inscription> getAllInscriptions() {
+        return inscriptionRepository.findAll();
+    }
+
     public List<Inscription> getInscriptionsByEtudiant(Long etudiantId) {
         return inscriptionRepository.findByEtudiantId(etudiantId);
     }

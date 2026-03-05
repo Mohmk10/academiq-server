@@ -75,6 +75,13 @@ public class NoteController {
                 .body(ApiResponse.success("Évaluation créée avec succès", noteMapper.toEvaluationResponse(evaluation)));
     }
 
+    @GetMapping("/evaluations")
+    @IsAllExceptEtudiant
+    public ResponseEntity<ApiResponse<List<EvaluationResponse>>> getAllEvaluations() {
+        return ResponseEntity.ok(ApiResponse.success(
+                noteMapper.toEvaluationResponseList(noteService.getAllEvaluations())));
+    }
+
     @GetMapping("/evaluations/module/{moduleId}")
     @IsAllExceptEtudiant
     public ResponseEntity<ApiResponse<List<EvaluationResponse>>> getEvaluationsParModule(
