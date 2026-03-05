@@ -23,7 +23,7 @@ public class DatabaseResetService {
     private static final String[] TABLES = {
             "historique_notes", "notes", "evaluations", "alertes", "regles_alerte",
             "audit_logs", "affectations", "inscriptions", "etudiants", "enseignants",
-            "admins", "modules_formation", "ues", "semestres", "promotions",
+            "admins", "modules_formation", "unites_enseignement", "semestres", "promotions",
             "niveaux", "filieres", "utilisateurs"
     };
 
