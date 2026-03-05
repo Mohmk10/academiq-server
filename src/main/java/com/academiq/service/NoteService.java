@@ -24,6 +24,7 @@ import com.academiq.repository.EtudiantRepository;
 import com.academiq.repository.EvaluationRepository;
 import com.academiq.repository.InscriptionRepository;
 import com.academiq.repository.ModuleFormationRepository;
+import com.academiq.repository.HistoriqueNoteRepository;
 import com.academiq.repository.NoteRepository;
 import com.academiq.repository.PromotionRepository;
 import com.academiq.repository.UtilisateurRepository;
@@ -57,6 +58,7 @@ public class NoteService {
     private final UtilisateurRepository utilisateurRepository;
     private final ModuleFormationRepository moduleFormationRepository;
     private final PromotionRepository promotionRepository;
+    private final HistoriqueNoteRepository historiqueNoteRepository;
     private final NoteValidationService noteValidationService;
     private final HistoriqueNoteService historiqueNoteService;
     private final DetectionAlerteService detectionAlerteService;
@@ -266,6 +268,14 @@ public class NoteService {
     public Note getNoteById(Long id) {
         return noteRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Note", "id", id));
+    }
+
+    @Transactional
+    public void deleteNote(Long noteId) {
+        Note note = getNoteById(noteId);
+        historiqueNoteRepository.deleteByNoteId(noteId);
+        noteRepository.delete(note);
+        log.info("Note {} supprimée définitivement (avec historique)", noteId);
     }
 
     // ======================== Récapitulatifs ========================

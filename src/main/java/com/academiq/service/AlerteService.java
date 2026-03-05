@@ -89,6 +89,13 @@ public class AlerteService {
         return alerteRepository.save(alerte);
     }
 
+    @Transactional
+    public void deleteAlerte(Long alerteId) {
+        Alerte alerte = getAlerteById(alerteId);
+        alerteRepository.delete(alerte);
+        log.info("Alerte {} supprimée définitivement", alerteId);
+    }
+
     @Transactional(readOnly = true)
     public Map<String, Long> getStatistiquesAlertes() {
         Map<String, Long> stats = new LinkedHashMap<>();

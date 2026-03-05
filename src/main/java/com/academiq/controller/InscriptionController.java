@@ -13,6 +13,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -70,5 +71,12 @@ public class InscriptionController {
     public ResponseEntity<ApiResponse<Void>> annulerInscription(@PathVariable Long id) {
         inscriptionService.annulerInscription(id);
         return ResponseEntity.ok(ApiResponse.success("Inscription annulée avec succès"));
+    }
+
+    @DeleteMapping("/{id}")
+    @IsAdmin
+    public ResponseEntity<ApiResponse<Void>> supprimerInscription(@PathVariable Long id) {
+        inscriptionService.deleteInscription(id);
+        return ResponseEntity.ok(ApiResponse.success("Inscription supprimée avec succès"));
     }
 }

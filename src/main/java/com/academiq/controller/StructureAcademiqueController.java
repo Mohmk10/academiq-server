@@ -112,6 +112,13 @@ public class StructureAcademiqueController {
         return ResponseEntity.ok(ApiResponse.success(structureMapper.toNiveauResponse(structureService.getNiveauById(id))));
     }
 
+    @DeleteMapping("/niveaux/{id}")
+    @IsAdmin
+    public ResponseEntity<ApiResponse<Void>> supprimerNiveau(@PathVariable Long id) {
+        structureService.deleteNiveau(id);
+        return ResponseEntity.ok(ApiResponse.success("Niveau supprimé avec succès"));
+    }
+
     // ======================== Promotions ========================
 
     @PostMapping("/niveaux/{niveauId}/promotions")
@@ -150,6 +157,13 @@ public class StructureAcademiqueController {
         return ResponseEntity.ok(ApiResponse.success("Promotion modifiée avec succès", structureMapper.toPromotionResponse(updated)));
     }
 
+    @DeleteMapping("/promotions/{id}")
+    @IsAdmin
+    public ResponseEntity<ApiResponse<Void>> supprimerPromotion(@PathVariable Long id) {
+        structureService.deletePromotion(id);
+        return ResponseEntity.ok(ApiResponse.success("Promotion supprimée avec succès"));
+    }
+
     // ======================== Semestres ========================
 
     @PostMapping("/niveaux/{niveauId}/semestres")
@@ -165,6 +179,13 @@ public class StructureAcademiqueController {
     public ResponseEntity<ApiResponse<List<SemestreResponse>>> listerSemestres(@PathVariable Long niveauId) {
         List<SemestreResponse> semestres = structureMapper.toSemestreResponseList(structureService.getSemestresByNiveau(niveauId));
         return ResponseEntity.ok(ApiResponse.success(semestres));
+    }
+
+    @DeleteMapping("/semestres/{id}")
+    @IsAdmin
+    public ResponseEntity<ApiResponse<Void>> supprimerSemestre(@PathVariable Long id) {
+        structureService.deleteSemestre(id);
+        return ResponseEntity.ok(ApiResponse.success("Semestre supprimé avec succès"));
     }
 
     // ======================== UEs ========================

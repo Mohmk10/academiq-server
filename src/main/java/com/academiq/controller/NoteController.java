@@ -196,6 +196,13 @@ public class NoteController {
                 noteMapper.toNoteResponse(noteService.getNoteById(id))));
     }
 
+    @DeleteMapping("/{id}")
+    @IsEnseignantOrAdmin
+    public ResponseEntity<ApiResponse<Void>> supprimerNote(@PathVariable Long id) {
+        noteService.deleteNote(id);
+        return ResponseEntity.ok(ApiResponse.success("Note supprimée avec succès"));
+    }
+
     // ======================== Statistiques ========================
 
     @GetMapping("/evaluations/{id}/statistiques")

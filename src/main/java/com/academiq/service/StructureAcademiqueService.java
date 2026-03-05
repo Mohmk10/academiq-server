@@ -159,6 +159,13 @@ public class StructureAcademiqueService {
         return promotionRepository.save(promotion);
     }
 
+    @Transactional
+    public void deletePromotion(Long id) {
+        Promotion promotion = getPromotionById(id);
+        promotionRepository.delete(promotion);
+        log.info("Promotion supprimée : {}", id);
+    }
+
     // ======================== Semestres ========================
 
     public List<Semestre> getSemestresByNiveau(Long niveauId) {
@@ -180,6 +187,13 @@ public class StructureAcademiqueService {
         Semestre saved = semestreRepository.save(semestre);
         log.info("Semestre {} créé pour le niveau {}", saved.getSemestre(), niveau.getNiveau());
         return saved;
+    }
+
+    @Transactional
+    public void deleteSemestre(Long id) {
+        Semestre semestre = getSemestreById(id);
+        semestreRepository.delete(semestre);
+        log.info("Semestre supprimé : {}", id);
     }
 
     // ======================== UEs ========================

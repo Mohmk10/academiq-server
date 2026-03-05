@@ -80,6 +80,14 @@ public class InscriptionService {
         log.info("Inscription {} annulée", inscriptionId);
     }
 
+    @Transactional
+    public void deleteInscription(Long inscriptionId) {
+        Inscription inscription = inscriptionRepository.findById(inscriptionId)
+                .orElseThrow(() -> new ResourceNotFoundException("Inscription", "id", inscriptionId));
+        inscriptionRepository.delete(inscription);
+        log.info("Inscription {} supprimée définitivement", inscriptionId);
+    }
+
     public long countInscritsParPromotion(Long promotionId) {
         return inscriptionRepository.countByPromotionId(promotionId);
     }

@@ -69,6 +69,13 @@ public class RegleAlerteService {
     }
 
     @Transactional
+    public void deleteRegle(Long id) {
+        RegleAlerte regle = getRegleById(id);
+        regleAlerteRepository.delete(regle);
+        log.info("Règle d'alerte {} supprimée", id);
+    }
+
+    @Transactional
     public void initialiserReglesParDefaut() {
         creerSiAbsent("Moyenne module faible",
                 "Alerte lorsque la moyenne d'un module est inférieure à 10/20",

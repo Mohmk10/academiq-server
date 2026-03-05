@@ -15,6 +15,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -75,5 +76,12 @@ public class AffectationController {
     public ResponseEntity<ApiResponse<Void>> desactiverAffectation(@PathVariable Long id) {
         affectationService.desactiverAffectation(id);
         return ResponseEntity.ok(ApiResponse.success("Affectation désactivée avec succès"));
+    }
+
+    @DeleteMapping("/{id}")
+    @IsAdmin
+    public ResponseEntity<ApiResponse<Void>> supprimerAffectation(@PathVariable Long id) {
+        affectationService.deleteAffectation(id);
+        return ResponseEntity.ok(ApiResponse.success("Affectation supprimée avec succès"));
     }
 }

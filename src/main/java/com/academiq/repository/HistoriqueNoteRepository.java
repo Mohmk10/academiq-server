@@ -10,4 +10,6 @@ public interface HistoriqueNoteRepository extends JpaRepository<HistoriqueNote, 
     List<HistoriqueNote> findByNoteIdOrderByDateModificationDesc(Long noteId);
 
     List<HistoriqueNote> findByModifieParIdOrderByDateModificationDesc(Long utilisateurId);
+
+    void deleteByNoteId(Long noteId);
 }

@@ -73,6 +73,14 @@ public class AffectationService {
     }
 
     @Transactional
+    public void deleteAffectation(Long affectationId) {
+        Affectation affectation = affectationRepository.findById(affectationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Affectation", "id", affectationId));
+        affectationRepository.delete(affectation);
+        log.info("Affectation {} supprimée définitivement", affectationId);
+    }
+
+    @Transactional
     public void desactiverAffectation(Long affectationId) {
         Affectation affectation = affectationRepository.findById(affectationId)
                 .orElseThrow(() -> new ResourceNotFoundException("Affectation", "id", affectationId));
