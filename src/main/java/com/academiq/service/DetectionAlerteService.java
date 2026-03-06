@@ -19,6 +19,7 @@ import com.academiq.repository.EtudiantRepository;
 import com.academiq.repository.EvaluationRepository;
 import com.academiq.repository.InscriptionRepository;
 import com.academiq.repository.NoteRepository;
+import com.academiq.repository.PromotionRepository;
 import com.academiq.repository.RegleAlerteRepository;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
@@ -45,6 +46,7 @@ public class DetectionAlerteService {
     private final CalculService calculService;
     private final InscriptionRepository inscriptionRepository;
     private final EtudiantRepository etudiantRepository;
+    private final PromotionRepository promotionRepository;
     private final NotificationService notificationService;
 
     private static final Set<TypeEvaluation> TYPES_EXAMEN = EnumSet.of(
@@ -261,11 +263,7 @@ public class DetectionAlerteService {
 
     @Transactional
     public List<Alerte> analyserToutesPromotions() {
-        List<Promotion> promotions = inscriptionRepository.findAll().stream()
-                .filter(i -> i.getStatut() == StatutInscription.ACTIVE)
-                .map(Inscription::getPromotion)
-                .distinct()
-                .toList();
+        List<Promotion> promotions = promotionRepository.findByActifTrue();
 
         List<Alerte> toutesAlertes = new ArrayList<>();
         for (Promotion promotion : promotions) {

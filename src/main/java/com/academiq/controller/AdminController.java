@@ -3,6 +3,7 @@ package com.academiq.controller;
 import com.academiq.dto.ApiResponse;
 import com.academiq.entity.Promotion;
 import com.academiq.repository.PromotionRepository;
+import com.academiq.security.IsAdmin;
 import com.academiq.security.IsSuperAdmin;
 import com.academiq.service.DatabaseResetService;
 import com.academiq.service.ExportExcelService;
@@ -47,7 +48,7 @@ public class AdminController {
     }
 
     @GetMapping("/export-donnees")
-    @IsSuperAdmin
+    @IsAdmin
     public ResponseEntity<byte[]> exporterToutesDonnees() throws IOException {
         List<Promotion> promotions = promotionRepository.findByActifTrue();
 
