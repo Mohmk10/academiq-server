@@ -6,6 +6,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.util.Map;
+
 @Getter
 @Setter
 @NoArgsConstructor
@@ -17,4 +19,5 @@ public class StatistiquesAlertesDTO {
     private long totalAttention;
     private long totalTraitees;
     private long totalResolues;
+    private Map<String, Long> parType;
 }

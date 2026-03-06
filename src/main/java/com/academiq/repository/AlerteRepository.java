@@ -33,6 +33,8 @@ public interface AlerteRepository extends JpaRepository<Alerte, Long> {
 
     long countByNiveauAndStatut(NiveauAlerte niveau, StatutAlerte statut);
 
+    long countByTypeAndStatut(TypeAlerte type, StatutAlerte statut);
+
     Page<Alerte> findByStatutAndNiveau(StatutAlerte statut, NiveauAlerte niveau, Pageable pageable);
 
     @Query("SELECT a FROM Alerte a WHERE " +

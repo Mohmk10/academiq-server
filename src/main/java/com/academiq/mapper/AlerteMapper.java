@@ -89,13 +89,15 @@ public class AlerteMapper {
                 .build();
     }
 
-    public StatistiquesAlertesDTO toStatistiquesDTO(Map<String, Long> stats) {
+    @SuppressWarnings("unchecked")
+    public StatistiquesAlertesDTO toStatistiquesDTO(Map<String, Object> stats) {
         return StatistiquesAlertesDTO.builder()
-                .totalActives(stats.getOrDefault("totalActives", 0L))
-                .totalCritiques(stats.getOrDefault("totalCritiques", 0L))
-                .totalAttention(stats.getOrDefault("totalAttention", 0L))
-                .totalTraitees(stats.getOrDefault("totalTraitees", 0L))
-                .totalResolues(stats.getOrDefault("totalResolues", 0L))
+                .totalActives((Long) stats.getOrDefault("totalActives", 0L))
+                .totalCritiques((Long) stats.getOrDefault("totalCritiques", 0L))
+                .totalAttention((Long) stats.getOrDefault("totalAttention", 0L))
+                .totalTraitees((Long) stats.getOrDefault("totalTraitees", 0L))
+                .totalResolues((Long) stats.getOrDefault("totalResolues", 0L))
+                .parType((Map<String, Long>) stats.get("parType"))
                 .build();
     }
 }

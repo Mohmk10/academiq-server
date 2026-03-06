@@ -97,13 +97,21 @@ public class AlerteService {
     }
 
     @Transactional(readOnly = true)
-    public Map<String, Long> getStatistiquesAlertes() {
-        Map<String, Long> stats = new LinkedHashMap<>();
+    public Map<String, Object> getStatistiquesAlertes() {
+        Map<String, Object> stats = new LinkedHashMap<>();
         stats.put("totalActives", alerteRepository.countByStatut(StatutAlerte.ACTIVE));
         stats.put("totalCritiques", alerteRepository.countByNiveauAndStatut(NiveauAlerte.CRITIQUE, StatutAlerte.ACTIVE));
         stats.put("totalAttention", alerteRepository.countByNiveauAndStatut(NiveauAlerte.ATTENTION, StatutAlerte.ACTIVE));
         stats.put("totalTraitees", alerteRepository.countByStatut(StatutAlerte.TRAITEE));
         stats.put("totalResolues", alerteRepository.countByStatut(StatutAlerte.RESOLUE));
+
+        Map<String, Long> parType = new LinkedHashMap<>();
+        for (TypeAlerte type : TypeAlerte.values()) {
+            long count = alerteRepository.countByTypeAndStatut(type, StatutAlerte.ACTIVE);
+            parType.put(type.name(), count);
+        }
+        stats.put("parType", parType);
+
         return stats;
     }
 }
