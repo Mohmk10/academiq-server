@@ -3,6 +3,7 @@ package com.academiq.dto.utilisateur;
 import com.academiq.entity.NiveauAdmin;
 import com.academiq.entity.StatutEnseignant;
 import com.academiq.entity.StatutEtudiant;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -23,6 +24,7 @@ public class UtilisateurUpdateRequest {
     @Size(max = 100)
     private String prenom;
 
+    @Pattern(regexp = "^\\+221(7[0-8]|33|30)[0-9]{7}$", message = "Format attendu : +221XXXXXXXXX (numéro sénégalais valide)")
     private String telephone;
     private LocalDate dateNaissance;
     private String adresse;
@@ -31,6 +33,7 @@ public class UtilisateurUpdateRequest {
     // Champs spécifiques Etudiant
     private String niveauActuel;
     private String filiereActuelle;
+    @Pattern(regexp = "^\\+221(7[0-8]|33|30)[0-9]{7}$", message = "Format attendu : +221XXXXXXXXX (numéro sénégalais valide)")
     private String numeroTuteur;
     private String nomTuteur;
     private StatutEtudiant statutEtudiant;

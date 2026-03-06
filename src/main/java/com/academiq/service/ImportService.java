@@ -28,6 +28,7 @@ public class ImportService {
 
     private static final Logger log = LoggerFactory.getLogger(ImportService.class);
     private static final String SEPARATEUR = ";";
+    private static final String REGEX_TELEPHONE_SN = "^\\+221(7[0-8]|33|30)[0-9]{7}$";
     private static final String MOT_DE_PASSE_DEFAUT = "Academiq2026!";
 
     private final UtilisateurRepository utilisateurRepository;
@@ -105,6 +106,10 @@ public class ImportService {
         String filiereActuelle = colonnes.length > 4 ? colonnes[4].trim() : null;
         String numeroTuteur = colonnes.length > 5 ? colonnes[5].trim() : null;
         String nomTuteur = colonnes.length > 6 ? colonnes[6].trim() : null;
+
+        if (numeroTuteur != null && !numeroTuteur.isEmpty() && !numeroTuteur.matches(REGEX_TELEPHONE_SN)) {
+            throw new IllegalArgumentException("Numéro tuteur invalide : " + numeroTuteur + ". Format attendu : +221XXXXXXXXX");
+        }
 
         Utilisateur utilisateur = Utilisateur.builder()
                 .nom(nom)

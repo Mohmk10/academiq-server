@@ -5,6 +5,7 @@ import com.academiq.entity.Role;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -38,6 +39,7 @@ public class UtilisateurCreateRequest {
     @NotNull
     private Role role;
 
+    @Pattern(regexp = "^\\+221(7[0-8]|33|30)[0-9]{7}$", message = "Format attendu : +221XXXXXXXXX (numéro sénégalais valide)")
     private String telephone;
     private LocalDate dateNaissance;
     private String adresse;
@@ -46,6 +48,7 @@ public class UtilisateurCreateRequest {
     private String matriculeEtudiant;
     private String niveauActuel;
     private String filiereActuelle;
+    @Pattern(regexp = "^\\+221(7[0-8]|33|30)[0-9]{7}$", message = "Format attendu : +221XXXXXXXXX (numéro sénégalais valide)")
     private String numeroTuteur;
     private String nomTuteur;
 
