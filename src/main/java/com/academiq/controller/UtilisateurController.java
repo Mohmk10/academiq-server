@@ -144,8 +144,8 @@ public class UtilisateurController {
     @IsSuperAdmin
     public ResponseEntity<ApiResponse<Void>> changerRole(
             @PathVariable Long id,
-            @RequestParam Role role) {
-        utilisateurService.changeRole(id, role);
+            @Valid @RequestBody com.academiq.dto.utilisateur.ChangeRoleRequest request) {
+        utilisateurService.changeRole(id, request.getRole(), request.getMotif());
         return ResponseEntity.ok(ApiResponse.success("Rôle modifié avec succès"));
     }
 

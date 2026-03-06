@@ -168,6 +168,16 @@ public class AlerteController {
                         alerteMapper.toAlerteResponseList(alertes)));
     }
 
+    @PostMapping("/analyser/toutes")
+    @IsAdmin
+    public ResponseEntity<ApiResponse<List<AlerteResponse>>> analyserToutesPromotions() {
+        List<Alerte> alertes = detectionAlerteService.analyserToutesPromotions();
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success(
+                        String.format("%d alerte(s) détectée(s) au total", alertes.size()),
+                        alerteMapper.toAlerteResponseList(alertes)));
+    }
+
     // ======================== Règles d'alerte ========================
 
     @GetMapping("/regles")

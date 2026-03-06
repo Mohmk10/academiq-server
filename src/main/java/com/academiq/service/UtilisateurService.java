@@ -162,7 +162,14 @@ public class UtilisateurService {
         }
 
         if (utilisateur.getRole() == Role.SUPER_ADMIN) {
+            if (current.getRole() != Role.SUPER_ADMIN) {
+                throw new ForbiddenException("Seul un SUPER_ADMIN peut supprimer un autre SUPER_ADMIN");
+            }
             securityService.verifierMinimumSuperAdmin();
+        }
+
+        if (utilisateur.getRole() == Role.ADMIN && current.getRole() != Role.SUPER_ADMIN) {
+            throw new ForbiddenException("Seul un SUPER_ADMIN peut supprimer un ADMIN");
         }
 
         auditLogService.logAccountDeletion(current.getEmail(), utilisateur.getEmail());
@@ -186,8 +193,12 @@ public class UtilisateurService {
         Utilisateur current = securityService.getCurrentUser();
         Utilisateur utilisateur = findById(id);
 
-        if (current.getRole() == Role.ADMIN && utilisateur.getRole() == Role.SUPER_ADMIN) {
-            throw new ForbiddenException("Un ADMIN ne peut pas modifier un SUPER_ADMIN");
+        if (current.getId().equals(id)) {
+            throw new BusinessException("Impossible de modifier l'activation de son propre compte");
+        }
+
+        if (utilisateur.getRole() == Role.SUPER_ADMIN && current.getRole() != Role.SUPER_ADMIN) {
+            throw new ForbiddenException("Seul un SUPER_ADMIN peut modifier un autre SUPER_ADMIN");
         }
 
         if (utilisateur.getRole() == Role.SUPER_ADMIN && utilisateur.isActif()) {
@@ -202,7 +213,7 @@ public class UtilisateurService {
     }
 
     @Transactional
-    public void changeRole(Long id, Role nouveauRole) {
+    public void changeRole(Long id, Role nouveauRole, String motif) {
         Utilisateur current = securityService.getCurrentUser();
         Utilisateur target = findById(id);
 
@@ -210,22 +221,34 @@ public class UtilisateurService {
             throw new BusinessException("Impossible de modifier son propre rôle");
         }
 
-        if (target.getRole() == Role.SUPER_ADMIN && nouveauRole != Role.SUPER_ADMIN) {
-            securityService.verifierMinimumSuperAdmin();
+        if (nouveauRole == Role.SUPER_ADMIN) {
+            throw new ForbiddenException("Le rôle SUPER_ADMIN ne peut pas être attribué via l'API");
+        }
+
+        if (target.getRole() == Role.SUPER_ADMIN) {
+            throw new ForbiddenException("Impossible de modifier le rôle d'un SUPER_ADMIN");
         }
 
         Role ancienRole = target.getRole();
+        if (ancienRole == nouveauRole) {
+            throw new BusinessException("L'utilisateur a déjà le rôle " + nouveauRole);
+        }
+
         target.setRole(nouveauRole);
 
         gererChangementProfil(target, ancienRole, nouveauRole);
 
         utilisateurRepository.save(target);
 
-        auditLogService.logRoleChange(
-                current.getEmail(), target.getEmail(),
-                ancienRole.name(), nouveauRole.name()
+        String details = String.format("Ancien=%s, Nouveau=%s", ancienRole.name(), nouveauRole.name());
+        if (motif != null && !motif.isBlank()) {
+            details += ", Motif=" + motif;
+        }
+        auditLogService.logAction(
+                com.academiq.entity.AuditAction.CHANGEMENT_ROLE,
+                current.getEmail(), target.getEmail(), details
         );
-        log.info("Rôle de l'utilisateur {} changé de {} en {}", id, ancienRole, nouveauRole);
+        log.info("Rôle de l'utilisateur {} changé de {} en {} (motif: {})", id, ancienRole, nouveauRole, motif);
     }
 
     public long countByRole(Role role) {

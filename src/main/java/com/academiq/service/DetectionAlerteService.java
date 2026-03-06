@@ -259,6 +259,24 @@ public class DetectionAlerteService {
         return toutesAlertes;
     }
 
+    @Transactional
+    public List<Alerte> analyserToutesPromotions() {
+        List<Promotion> promotions = inscriptionRepository.findAll().stream()
+                .filter(i -> i.getStatut() == StatutInscription.ACTIVE)
+                .map(Inscription::getPromotion)
+                .distinct()
+                .toList();
+
+        List<Alerte> toutesAlertes = new ArrayList<>();
+        for (Promotion promotion : promotions) {
+            toutesAlertes.addAll(analyserPromotion(promotion.getId()));
+        }
+
+        log.info("Analyse globale : {} alertes générées pour {} promotions",
+                toutesAlertes.size(), promotions.size());
+        return toutesAlertes;
+    }
+
     private boolean alerteExisteDeja(TypeAlerte type, Long etudiantId, Long moduleId) {
         return !alerteRepository.findByTypeAndEtudiantIdAndModuleFormationIdAndStatut(
                 type, etudiantId, moduleId, StatutAlerte.ACTIVE).isEmpty();
