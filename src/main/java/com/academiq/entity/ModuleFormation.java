@@ -2,7 +2,6 @@ package com.academiq.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
@@ -49,11 +48,11 @@ public class ModuleFormation extends BaseEntity {
     @Column(nullable = false)
     private double ponderationExamen;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne
     @JoinColumn(name = "unite_enseignement_id", nullable = false)
     private UniteEnseignement uniteEnseignement;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne
     @JoinColumn(name = "enseignant_id")
     private Enseignant enseignant;
 

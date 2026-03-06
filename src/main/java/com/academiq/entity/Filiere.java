@@ -39,11 +39,11 @@ public class Filiere extends BaseEntity {
     @Column(nullable = false)
     private boolean actif = true;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne
     @JoinColumn(name = "responsable_id")
     private Enseignant responsable;
 
     @Builder.Default
-    @OneToMany(mappedBy = "filiere", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "filiere", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     private List<Niveau> niveaux = new ArrayList<>();
 }

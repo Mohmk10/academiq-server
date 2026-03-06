@@ -2,7 +2,6 @@ package com.academiq.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
@@ -43,7 +42,7 @@ public class Promotion extends BaseEntity {
     @Column(nullable = false)
     private boolean actif = true;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne
     @JoinColumn(name = "niveau_id", nullable = false)
     private Niveau niveau;
 

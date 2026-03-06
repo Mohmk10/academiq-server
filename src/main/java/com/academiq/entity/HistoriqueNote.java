@@ -2,7 +2,6 @@ package com.academiq.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
@@ -23,7 +22,7 @@ import java.time.LocalDateTime;
 @Table(name = "historique_notes")
 public class HistoriqueNote extends BaseEntity {
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne
     @JoinColumn(name = "note_id", nullable = false)
     private Note note;
 
@@ -40,7 +39,7 @@ public class HistoriqueNote extends BaseEntity {
     @Column(length = 500)
     private String motifModification;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne
     @JoinColumn(name = "modifie_par_id")
     private Utilisateur modifiePar;
 

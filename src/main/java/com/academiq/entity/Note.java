@@ -2,7 +2,6 @@ package com.academiq.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
@@ -33,15 +32,15 @@ public class Note extends BaseEntity {
     @Column(length = 500)
     private String commentaire;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne
     @JoinColumn(name = "etudiant_id", nullable = false)
     private Etudiant etudiant;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne
     @JoinColumn(name = "evaluation_id", nullable = false)
     private Evaluation evaluation;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne
     @JoinColumn(name = "saisie_par_id")
     private Utilisateur saisiePar;
 

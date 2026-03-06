@@ -42,11 +42,11 @@ public class UniteEnseignement extends BaseEntity {
     @Column(nullable = false)
     private double coefficient;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne
     @JoinColumn(name = "semestre_id", nullable = false)
     private Semestre semestre;
 
     @Builder.Default
-    @OneToMany(mappedBy = "uniteEnseignement", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "uniteEnseignement", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     private List<ModuleFormation> modules = new ArrayList<>();
 }

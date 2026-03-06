@@ -3,9 +3,9 @@ package com.academiq.entity;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
-import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
@@ -36,11 +36,11 @@ public class Semestre extends BaseEntity {
     @Column(nullable = false, length = 100)
     private String nom;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne
     @JoinColumn(name = "niveau_id", nullable = false)
     private Niveau niveau;
 
     @Builder.Default
-    @OneToMany(mappedBy = "semestre", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "semestre", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     private List<UniteEnseignement> uniteEnseignements = new ArrayList<>();
 }

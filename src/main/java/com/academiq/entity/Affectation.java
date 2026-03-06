@@ -2,7 +2,6 @@ package com.academiq.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
@@ -22,15 +21,15 @@ import lombok.Setter;
 @Table(name = "affectations", uniqueConstraints = @UniqueConstraint(columnNames = {"enseignant_id", "module_formation_id", "promotion_id"}))
 public class Affectation extends BaseEntity {
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne
     @JoinColumn(name = "enseignant_id", nullable = false)
     private Enseignant enseignant;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne
     @JoinColumn(name = "module_formation_id", nullable = false)
     private ModuleFormation moduleFormation;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne
     @JoinColumn(name = "promotion_id", nullable = false)
     private Promotion promotion;
 
