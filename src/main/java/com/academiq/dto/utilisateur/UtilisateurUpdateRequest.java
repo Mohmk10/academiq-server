@@ -3,6 +3,7 @@ package com.academiq.dto.utilisateur;
 import com.academiq.entity.NiveauAdmin;
 import com.academiq.entity.StatutEnseignant;
 import com.academiq.entity.StatutEtudiant;
+import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
@@ -17,6 +18,9 @@ import java.time.LocalDate;
 @NoArgsConstructor
 @AllArgsConstructor
 public class UtilisateurUpdateRequest {
+
+    @Email(message = "Format d'email invalide")
+    private String email;
 
     @Size(max = 100)
     private String nom;

@@ -120,6 +120,12 @@ public class UtilisateurService {
             }
         }
 
+        if (request.getEmail() != null && !request.getEmail().equals(utilisateur.getEmail())) {
+            if (utilisateurRepository.existsByEmail(request.getEmail())) {
+                throw new DuplicateResourceException("Utilisateur", "email", request.getEmail());
+            }
+            utilisateur.setEmail(request.getEmail());
+        }
         if (request.getNom() != null) {
             utilisateur.setNom(request.getNom());
         }
